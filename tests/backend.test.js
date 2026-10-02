@@ -39,7 +39,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
   const database = await localPostgres({ directory, port, password: dbPassword })
   let pool, restored, app
   const credentials = { dennis: token(), talissa: token() }
-  const newPassword = token()
+  const newPassword = 'Abcdef!g'
   let dennis, talissa, product
   function headers(session) { return { origin, cookie: session.cookie, 'x-csrf-token': session.csrfToken } }
   async function login(username, password, instance = app, loginOrigin = origin) {
@@ -72,6 +72,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.ok(initial.response.headers['set-cookie'].includes('SameSite=Strict'))
       assert.equal((await app.inject({ url: '/api/admin/produtos', headers: headers(initial) })).statusCode, 403)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/password', headers: { origin, cookie: initial.cookie }, payload: { currentPassword: credentials.dennis, newPassword } })).statusCode, 403)
+      const weak = await app.inject({ method: 'POST', url: '/api/auth/password', headers: headers(initial), payload: { currentPassword: credentials.dennis, newPassword: 'abcdefgh' } })
+      assert.equal(weak.statusCode, 400)
+      assert.match(weak.json().error, /maiúscula/)
       const changed = await app.inject({ method: 'POST', url: '/api/auth/password', headers: headers(initial), payload: { currentPassword: credentials.dennis, newPassword } })
       assert.equal(changed.statusCode, 200, changed.body)
       assert.equal((await app.inject({ url: '/api/auth/me', headers: headers(initial) })).statusCode, 401)
@@ -100,6 +103,38 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
         assert.equal((await app.inject('/api/catalogo')).statusCode, 200)
       } finally { await pool.query("UPDATE admins SET role='admin' WHERE username='dennis'") }
     })
+    await t.test('cadastro público cria cliente persistente sem acesso administrativo', async () => {
+      const payload = { name: 'Cliente Teste', email: ' CLIENTE@example.test ', password: 'Abcdef!g' }
+      const register = body => app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload: body })
+      assert.equal((await register({ ...payload, role: 'admin' })).statusCode, 400)
+      assert.equal((await register({ ...payload, email: 'dennis' })).statusCode, 400)
+      assert.equal((await app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin: 'https://intruso.invalid' }, payload })).statusCode, 403)
+      const response = await register(payload)
+      assert.equal(response.statusCode, 201, response.body)
+      assert.equal(response.body.includes(payload.password), false)
+      const customer = await login('cliente@EXAMPLE.test', payload.password)
+      assert.equal(customer.user.role, 'customer')
+      assert.equal(customer.user.mustChangePassword, false)
+      for (const url of ['/api/admin/produtos', '/api/admin/historico']) assert.equal((await app.inject({ url, headers: headers(customer) })).statusCode, 403)
+      assert.equal((await save(customer, fixture(), 0)).statusCode, 403)
+      assert.equal((await register({ ...payload, email: 'cliente@example.test' })).statusCode, 409)
+      const weak = await register({ ...payload, email: 'outra@example.test', password: 'ABCDEFG!' })
+      assert.equal(weak.statusCode, 400)
+      assert.match(weak.json().error, /minúscula/)
+      const stored = (await pool.query("SELECT * FROM admins WHERE username='cliente@example.test'")).rows[0]
+      assert.notEqual(stored.password_hash, payload.password)
+      assert.equal((await pool.query("SELECT count(*)::int AS count FROM admins WHERE username='cliente@example.test'")).rows[0].count, 1)
+      assert.equal((await app.inject({ method: 'POST', url: '/api/auth/logout', headers: headers(customer) })).statusCode, 200)
+      assert.equal((await app.inject({ url: '/api/auth/me', headers: headers(customer) })).statusCode, 401)
+    })
+    await t.test('cadastro rejeita dados inválidos e limita tentativas', async () => {
+      const limited = await buildApp({ pool, origin })
+      try {
+        const payload = { name: '  ', email: 'invalido', password: token() }
+        for (let i = 0; i < 5; i++) assert.equal((await limited.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload })).statusCode, 400)
+        assert.equal((await limited.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload })).statusCode, 429)
+      } finally { await limited.close() }
+    })
     await t.test('sessões e origens de desenvolvimento não são aceitas em produção', async () => {
       const prod = await buildApp({ pool, origin: 'https://studiocamadas.com.br', production: true, environment: 'production' })
       try {
@@ -114,6 +149,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     })
     await t.test('salvar rascunho persiste no banco compartilhado e exige CSRF', async () => {
       product = fixture()
+      product.cores[0].imagem = '/produtos/teste/verde.png'
       const denied = await app.inject({ method: 'PUT', url: `/api/admin/produtos/${product.id}`, headers: { origin, cookie: dennis.cookie }, payload: { produto: product, revision: 0 } })
       assert.equal(denied.statusCode, 403)
       const saved = await save(dennis, product, 0)
@@ -121,7 +157,24 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(saved.json().revision, 1)
       const shared = await app.inject({ url: '/api/admin/produtos', headers: headers(talissa) })
       assert.equal(shared.json().produtos[0].id, product.id)
+      assert.equal(shared.json().produtos[0].cores[0].imagem, '/produtos/teste/verde.png')
       assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
+    })
+    await t.test('prévia local mostra apenas rascunhos selecionados sem liberar produção ou dados privados', async () => {
+      const preview = await buildApp({ pool, origin, catalogPreviewIds: [product.id] })
+      try {
+        const items = (await preview.inject('/api/catalogo')).json().produtos
+        assert.equal(items.length, 1)
+        assert.equal(items[0].id, product.id)
+        assert.equal(items[0].emTeste, true)
+        assert.equal(items[0].ficha, undefined)
+        assert.equal(items[0].origem, undefined)
+        assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
+        assert.equal((await readCatalog(pool)).produtos[0].publicado, false)
+      } finally { await preview.close() }
+      for (const options of [{ production: true, origin: 'https://studiocamadas.com.br' }, { environment: 'production' }, { origin: 'https://dev.studiocamadas.com.br' }]) {
+        await assert.rejects(buildApp({ pool, origin, catalogPreviewIds: [product.id], ...options }), /exclusiva do ambiente local/)
+      }
     })
     await t.test('publicação expõe só dados comerciais e guarda revisão e responsável', async () => {
       product.publicado = true
@@ -131,6 +184,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(publicProduct.precoCentavos, 129990)
       assert.equal(publicProduct.ficha, undefined)
       assert.equal(publicProduct.origem, undefined)
+      assert.equal(publicProduct.cores[0].imagem, '/produtos/teste/verde.png')
       const history = (await app.inject({ url: '/api/admin/historico', headers: headers(dennis) })).json().eventos
       assert.ok(history.some(e => e.actor_name === 'Talissa' && e.product_id === product.id))
       assert.equal(JSON.stringify(history).includes('password_hash'), false)
@@ -154,6 +208,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(imported.statusCode, 400)
       assert.deepEqual(await readCatalog(pool), before)
       assert.equal((await save(dennis, { ...fixture(), imagens: ['javascript:alert(1)'] }, before.revision)).statusCode, 400)
+      const invalidImage = fixture()
+      invalidImage.cores[0].imagem = 'javascript:alert(1)'
+      assert.equal((await save(dennis, invalidImage, before.revision)).statusCode, 400)
       assert.equal((await save(dennis, { ...fixture(), cores: null }, before.revision)).statusCode, 400)
       const existing = (await pool.query('SELECT * FROM variants LIMIT 1')).rows[0]
       await assert.rejects(pool.query('INSERT INTO variants(product_id,id,sku_key,stock_site) VALUES($1,$2,$3,$4)', [existing.product_id, randomUUID(), existing.sku_key, 0]), { code: '23505' })
@@ -208,7 +265,8 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       await migrate(restored)
       await restoreDatabase(restored, JSON.parse(JSON.stringify(snapshot)))
       assert.deepEqual(await readCatalog(restored), await readCatalog(pool))
-      assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 2)
+      assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 3)
+      assert.equal((await restored.query("SELECT role FROM admins WHERE username='cliente@example.test'")).rows[0].role, 'customer')
       assert.equal((await restored.query('SELECT * FROM sessions')).rowCount, 0)
       assert.equal((await restored.query('SELECT * FROM product_revisions')).rowCount, (await pool.query('SELECT * FROM product_revisions')).rowCount)
       await assert.rejects(restoreDatabase(restored, snapshot), /banco vazio/)

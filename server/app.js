@@ -5,16 +5,19 @@ import { hashPassword, verifyPassword, token, digest, sameToken, validPassword }
 import { transaction } from './db.js'
 import { audit, fail, publicCatalog, readCatalog, saveCatalog } from './catalog.js'
 import { podeAdministrar } from '../src/lib/acesso.js'
+import { randomUUID } from 'node:crypto'
+import { REGRAS_SENHA } from '../src/lib/senha.js'
 
 const userView = row => ({ id: row.id, username: row.username, name: row.name, role: row.role, mustChangePassword: row.must_change_password })
 const credentials = {
   type: 'object', additionalProperties: false, required: ['username', 'password'],
-  properties: { username: { type: 'string', minLength: 1, maxLength: 80 }, password: { type: 'string', minLength: 1, maxLength: 128 } },
+  properties: { username: { type: 'string', minLength: 1, maxLength: 254 }, password: { type: 'string', minLength: 1, maxLength: 128 } },
 }
 
-export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10 }) {
+export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10, catalogPreviewIds = [] }) {
   if (!['development', 'production'].includes(environment)) throw new Error('APP_ENV deve ser development ou production.')
   if (new URL(origin).origin !== origin || (production && !origin.startsWith('https://'))) throw new Error('APP_ORIGIN deve ser uma origem exata; produção exige HTTPS.')
+  if (catalogPreviewIds.length && (production || environment !== 'development' || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname))) throw new Error('Prévia de rascunhos é exclusiva do ambiente local de desenvolvimento.')
   const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024, trustProxy: false, ajv: { customOptions: { removeAdditional: false } } })
   await app.register(cookie)
   await app.register(rateLimit, { global: false, errorResponseBuilder: () => ({ statusCode: 429, error: 'Muitas tentativas. Aguarde um minuto antes de tentar novamente.' }) })
@@ -51,7 +54,33 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
   }
 
   app.get('/api/health', async () => { await pool.query('SELECT 1'); return { status: 'ok' } })
-  app.get('/api/catalogo', async () => ({ produtos: await publicCatalog(pool) }))
+  app.get('/api/catalogo', async () => ({ produtos: await publicCatalog(pool, catalogPreviewIds) }))
+  app.post('/api/auth/register', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    schema: { body: {
+      type: 'object', additionalProperties: false, required: ['name', 'email', 'password'],
+      properties: {
+        name: { type: 'string', minLength: 2, maxLength: 120 },
+        email: { type: 'string', minLength: 3, maxLength: 254 },
+        password: { type: 'string', maxLength: 128 },
+      },
+    } },
+  }, async (request, reply) => {
+    const name = request.body.name.trim()
+    const email = request.body.email.trim().toLowerCase()
+    if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw fail(400, 'Informe nome e e-mail válido.')
+    }
+    if (!validPassword(request.body.password)) throw fail(400, REGRAS_SENHA)
+    const passwordHash = await hashPassword(request.body.password)
+    await transaction(pool, async client => {
+      // A tabela de identidades mantém seu nome original. O perfil nunca vem do cliente.
+      const created = await client.query("INSERT INTO admins(id,username,name,password_hash,role,must_change_password) VALUES($1,$2,$3,$4,'customer',false) ON CONFLICT(username) DO NOTHING RETURNING id", [randomUUID(), email, name, passwordHash])
+      if (!created.rowCount) throw fail(409, 'Não foi possível criar a conta com esse e-mail. Tente entrar ou solicite ajuda para recuperar o acesso.')
+      await audit(client, created.rows[0].id, 'auth.customer_registered')
+    })
+    return reply.code(201).send({ ok: true })
+  })
   app.post('/api/auth/login', { schema: { body: credentials }, config: { rateLimit: { max: loginMax, timeWindow: '1 minute' } } }, async (request, reply) => {
     const username = request.body.username.trim().toLowerCase()
     const result = await transaction(pool, async client => {
@@ -83,10 +112,11 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
   app.post('/api/auth/password', {
     onRequest: authenticated,
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-    schema: { body: { type: 'object', additionalProperties: false, required: ['currentPassword', 'newPassword'], properties: { currentPassword: { type: 'string', maxLength: 128 }, newPassword: { type: 'string', minLength: 12, maxLength: 128 } } } },
+    schema: { body: { type: 'object', additionalProperties: false, required: ['currentPassword', 'newPassword'], properties: { currentPassword: { type: 'string', maxLength: 128 }, newPassword: { type: 'string', maxLength: 128 } } } },
   }, async (request, reply) => {
     const { currentPassword, newPassword } = request.body
-    if (!validPassword(newPassword) || currentPassword === newPassword) throw fail(400, 'Escolha uma senha nova com 12 a 128 caracteres.')
+    if (!validPassword(newPassword)) throw fail(400, REGRAS_SENHA)
+    if (currentPassword === newPassword) throw fail(400, 'Escolha uma senha diferente da atual.')
     await transaction(pool, async client => {
       const result = await client.query('SELECT password_hash FROM admins WHERE id=$1 FOR UPDATE', [request.admin.id])
       if (!await verifyPassword(currentPassword, result.rows[0].password_hash)) throw fail(400, 'Senha atual incorreta.')

@@ -12,7 +12,7 @@ export default function Navbar({ quantidadeCarrinho = 0, user = null }) {
     { nome: 'Sobre', href: '#sobre' },
     { nome: 'Contato', href: '#contato' },
     ...(podeAdministrar(user) ? [{ nome: 'Administração', href: '/admin' }] : []),
-    { nome: user ? 'Minha conta' : 'Entrar', href: '/login' },
+    { nome: user ? 'Minha conta' : 'Entrar/Cadastrar', href: '/login' },
   ]
 
   function buscar(event) {

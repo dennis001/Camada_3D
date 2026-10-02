@@ -1,3 +1,4 @@
+import { REGRAS_SENHA, validarFormularioAcesso } from '../lib/senha'
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { api, downloadJson } from '../lib/api'
 import { carregarProdutos, criarBackup, lerBackup, LIMITE_BACKUP_BYTES } from '../lib/persistencia'
@@ -61,6 +62,7 @@ export default function Administracao({ session, setSession }) {
   async function changePassword(event) {
     event.preventDefault()
     if (dirty) { setError('Salve ou descarte as alterações do produto antes de trocar a senha.'); return }
+    try { validarFormularioAcesso(event.currentTarget) } catch (error) { setError(error.message); return }
     const fields = new FormData(event.currentTarget)
     if (fields.get('newPassword') !== fields.get('confirmPassword')) { setError('A confirmação da nova senha não confere.'); return }
     setBusy(true); setError('')
@@ -105,12 +107,12 @@ export default function Administracao({ session, setSession }) {
           <button className="rounded-lg border px-4 py-2 disabled:opacity-50" disabled={busy || dirty} onClick={logout}>Sair</button>
           {dirty && <p className="w-full text-sm text-gray-600">Salve, ou baixe o rascunho e descarte as alterações, antes de sair.</p>}
         </div>
-        {(session.user.mustChangePassword || changingPassword) && <form onSubmit={changePassword} className="mb-6 max-w-lg space-y-4 rounded-xl border bg-white p-6">
+        {(session.user.mustChangePassword || changingPassword) && <form noValidate onSubmit={changePassword} className="mb-6 max-w-lg space-y-4 rounded-xl border bg-white p-6">
           <h3 className="text-xl font-semibold">{session.user.mustChangePassword ? 'Defina sua senha pessoal' : 'Alterar senha'}</h3>
-          <p className="text-sm text-gray-600">Use entre 12 e 128 caracteres. A alteração encerra suas sessões anteriores.</p>
+          <p className="text-sm text-gray-600">{REGRAS_SENHA} A alteração encerra suas sessões anteriores.</p>
           <label className="block">Senha atual<input name="currentPassword" type="password" autoComplete="current-password" required maxLength={128} className={inputClass} /></label>
-          <label className="block">Nova senha<input name="newPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className={inputClass} /></label>
-          <label className="block">Confirmar nova senha<input name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className={inputClass} /></label>
+          <label className="block">Nova senha<input name="newPassword" type="password" autoComplete="new-password" required minLength={8} maxLength={128} className={inputClass} /></label>
+          <label className="block">Confirmar nova senha<input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} maxLength={128} className={inputClass} /></label>
           <button disabled={busy} className="btn-primary disabled:opacity-50">Salvar nova senha</button>
         </form>}
         {!session.user.mustChangePassword && <>

@@ -122,7 +122,7 @@ function Valor({ rotulo, valor, destaque = false }) {
     <div className={`rounded-xl p-3 ${destaque ? 'bg-camada-dark-900 text-white' : 'bg-gray-50 text-camada-dark-900'}`}>
       <dt className={`text-xs ${destaque ? 'text-gray-300' : 'text-gray-600'}`}>{rotulo}</dt>
       <dd className={`mt-1 text-xl font-semibold ${valor != null && valor < 0 ? (destaque ? 'text-red-300' : 'text-red-700') : ''}`}>
-        {valor == null ? 'Pendente' : formatarMoeda(valor)}
+        {valor == null ? 'Não calculado' : formatarMoeda(valor)}
       </dd>
     </div>
   )
@@ -311,13 +311,13 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                     <option value="publicado">Publicado no catálogo</option>
                   </Campo>
                   <Campo rotulo="Material do produto" placeholder="Ex.: PLA" value={formulario.material} onChange={evento => campo('material', evento.target.value)} />
-                  <Campo rotulo="Medidas" placeholder="Ex.: 10 × 8 × 12 cm" value={formulario.medidas} onChange={evento => campo('medidas', evento.target.value)} />
+                  <Campo rotulo="Medidas (L × A × C)" placeholder="Ex.: L: 10 × A: 8 × C: 12 cm" value={formulario.medidas} onChange={evento => campo('medidas', evento.target.value)} dica="L = largura; A = altura; C = comprimento/profundidade. Informe também a unidade (cm ou mm)." />
                   <div className="sm:col-span-2"><Campo rotulo="Descrição" multiline rows={3} value={formulario.descricao} onChange={evento => campo('descricao', evento.target.value)} /></div>
                   <div className="sm:col-span-2"><Campo rotulo="Imagens" multiline rows={3} value={formulario.imagensTexto} onChange={evento => campo('imagensTexto', evento.target.value)} dica="Uma URL de imagem por linha. A primeira será a capa do produto." /></div>
                 </div>
               </Secao>
 
-              <Secao titulo="Cores, SKU e estoque" descricao="Cada cor tem SKU e quantidade próprios. O controle de movimentações, reservas e sincronização com a Shopee será implementado nas próximas etapas.">
+              <Secao titulo="Cores e SKU" descricao="Os produtos são produzidos sob encomenda. Cada cor tem seu próprio SKU; a quantidade no carrinho não depende de estoque de peças prontas.">
                 <div className="space-y-4">
                   {formulario.cores.map((item, indice) => (
                     <div key={item.id} className="rounded-xl border border-gray-200 p-3 sm:p-4">
@@ -325,18 +325,18 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                       <div className="grid gap-3 sm:grid-cols-3">
                         <Campo rotulo={`Nome da cor ${indice + 1}`} value={item.nome} onChange={evento => cor(indice, 'nome', evento.target.value)} placeholder="Ex.: Branco" />
                         <Campo rotulo={`SKU da cor ${indice + 1}`} value={item.sku} onChange={evento => cor(indice, 'sku', evento.target.value)} placeholder="Ex.: NATAL-01-BR" />
-                        <Campo rotulo={`Estoque da cor ${indice + 1}`} inputMode="numeric" value={item.estoqueSite} onChange={evento => cor(indice, 'estoqueSite', evento.target.value)} dica="Quantidade inteira de unidades." />
+                        <div className="sm:col-span-3"><Campo rotulo={`Imagem da cor ${indice + 1} (opcional)`} value={item.imagem || ''} onChange={evento => cor(indice, 'imagem', evento.target.value)} dica="URL ou caminho da imagem que será exibida ao escolher esta cor. Ela também aparece ao final da galeria." /></div>
                       </div>
                     </div>
                   ))}
-                  <button type="button" className={botaoSecundario} onClick={() => campo('cores', [...formulario.cores, { id: novoId(), nome: '', sku: '', estoqueSite: '' }])}><Plus size={16} aria-hidden="true" />Adicionar cor</button>
+                  <button type="button" className={botaoSecundario} onClick={() => campo('cores', [...formulario.cores, { id: novoId(), nome: '', sku: '', estoqueSite: '0' }])}><Plus size={16} aria-hidden="true" />Adicionar cor</button>
                 </div>
               </Secao>
 
-              <Secao titulo="Ficha de impressão" descricao="Registre uma placa com unidades iguais deste produto. Consumo e tempo são da placa inteira; embalagem e outros custos são por unidade. Campos vazios ficam pendentes, sem presumir custo zero.">
+              <Secao titulo="Ficha de impressão (opcional)" descricao="Preencha quando quiser estimar custos e rentabilidade. Estes dados não são obrigatórios para salvar ou publicar o produto. Consumo e tempo são da placa inteira; embalagem e outros custos são por unidade. Campos vazios não são considerados custo zero.">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Campo rotulo="Tempo de impressão da placa (min)" inputMode="decimal" placeholder="Ex.: 180" value={formulario.ficha.tempoPlacaMinutos} onChange={evento => ficha('tempoPlacaMinutos', evento.target.value)} />
-                  <Campo rotulo="Unidades por placa" inputMode="numeric" placeholder="Ex.: 4" value={formulario.ficha.unidadesPorPlaca} onChange={evento => ficha('unidadesPorPlaca', evento.target.value)} />
+                  <Campo rotulo="Tempo de impressão da placa (min)" inputMode="decimal" placeholder="Ex.: 180" value={formulario.ficha.tempoPlacaMinutos} onChange={evento => ficha('tempoPlacaMinutos', evento.target.value)} dica="Tempo total de uma placa com a quantidade abaixo. Usado na estimativa do carrinho, mesmo sem preencher os custos." />
+                  <Campo rotulo="Unidades por placa" inputMode="numeric" placeholder="Ex.: 4" value={formulario.ficha.unidadesPorPlaca} onChange={evento => ficha('unidadesPorPlaca', evento.target.value)} dica="Capacidade de um lote do mesmo produto e cor. Ex.: 5 peças com capacidade 4 exigem 2 placas." />
                 </div>
                 <div className="my-5 space-y-4">
                   {formulario.ficha.filamentos.map((item, indice) => (
@@ -353,10 +353,10 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                   <button type="button" className={botaoSecundario} onClick={() => ficha('filamentos', [...formulario.ficha.filamentos, { material: '', cor: '', gramasPorPlaca: '', precoKgCentavos: '' }])}><Plus size={16} aria-hidden="true" />Adicionar filamento</button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Campo rotulo="Potência média (W)" inputMode="decimal" value={formulario.ficha.potenciaWatts} onChange={evento => ficha('potenciaWatts', evento.target.value)} dica="Use a potência média medida durante a impressão." />
-                  <Campo rotulo="Tarifa de energia (R$/kWh)" inputMode="decimal" value={formulario.ficha.tarifaKwhCentavos} onChange={evento => ficha('tarifaKwhCentavos', evento.target.value)} />
-                  <Campo rotulo="Embalagem por unidade (R$)" inputMode="decimal" value={formulario.ficha.embalagemCentavos} onChange={evento => ficha('embalagemCentavos', evento.target.value)} />
-                  <Campo rotulo="Outros custos por unidade (R$)" inputMode="decimal" value={formulario.ficha.outrosCustosCentavos} onChange={evento => ficha('outrosCustosCentavos', evento.target.value)} dica="Informe 0,00 apenas quando confirmar que não há outros custos diretos." />
+                  <Campo rotulo="Potência média (W) — opcional" inputMode="decimal" value={formulario.ficha.potenciaWatts} onChange={evento => ficha('potenciaWatts', evento.target.value)} dica="Use a potência média medida durante a impressão." />
+                  <Campo rotulo="Tarifa de energia (R$/kWh) — opcional" inputMode="decimal" value={formulario.ficha.tarifaKwhCentavos} onChange={evento => ficha('tarifaKwhCentavos', evento.target.value)} />
+                  <Campo rotulo="Embalagem por unidade (R$) — opcional" inputMode="decimal" value={formulario.ficha.embalagemCentavos} onChange={evento => ficha('embalagemCentavos', evento.target.value)} />
+                  <Campo rotulo="Outros custos por unidade (R$) — opcional" inputMode="decimal" value={formulario.ficha.outrosCustosCentavos} onChange={evento => ficha('outrosCustosCentavos', evento.target.value)} dica="Informe 0,00 apenas quando confirmar que não há outros custos diretos." />
                   <Campo rotulo="Perfil de impressão" value={formulario.ficha.perfil} onChange={evento => ficha('perfil', evento.target.value)} placeholder="Impressora, bico, altura de camada, preenchimento…" />
                   <Campo rotulo="Referência do arquivo 3MF" value={formulario.ficha.arquivo3mf} onChange={evento => ficha('arquivo3mf', evento.target.value)} dica="Nome ou localização do arquivo. O arquivo não é enviado nem guardado pelo painel." />
                 </div>
@@ -379,7 +379,8 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
             </fieldset>
 
             <section aria-labelledby="resumo-custos" className="rounded-2xl border border-camada-teal-200 bg-white p-4 sm:p-6">
-              <h3 id="resumo-custos" className="text-lg font-semibold text-camada-dark-900">Estimativa por unidade</h3>
+              <h3 id="resumo-custos" className="text-lg font-semibold text-camada-dark-900">Estimativa por unidade (opcional)</h3>
+              <p className="mt-2 text-sm text-gray-600">Você pode salvar o produto sem preencher os custos. Os indicadores aparecem conforme os dados necessários forem informados.</p>
               <p className="mt-2 text-sm leading-relaxed text-gray-600">Calculada com os valores deste formulário, inclusive antes de salvar. O resultado é anterior a taxas de marketplace, descontos, frete, tributos e despesas fixas.</p>
               <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Valor rotulo="Filamento" valor={custos.filamentoCentavos} />
@@ -389,13 +390,20 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                 <Valor rotulo="Custo direto total" valor={custos.totalCentavos} destaque />
                 <Valor rotulo="Resultado estimado" valor={custos.lucroCentavos} destaque />
                 <Valor rotulo="Resultado por hora de máquina" valor={custos.lucroHoraCentavos} destaque />
-                <div className="rounded-xl bg-gray-50 p-3 text-camada-dark-900"><dt className="text-xs text-gray-600">Margem antes de taxas e despesas</dt><dd className="mt-1 text-xl font-semibold">{custos.margemPercentual == null ? 'Pendente' : `${custos.margemPercentual.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`}</dd></div>
+                <div className="rounded-xl bg-gray-50 p-3 text-camada-dark-900"><dt className="text-xs text-gray-600">Margem antes de taxas e despesas</dt><dd className="mt-1 text-xl font-semibold">{custos.margemPercentual == null ? 'Não calculado' : `${custos.margemPercentual.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`}</dd></div>
               </dl>
               {custos.tempoUnidadeMinutos != null && <p className="mt-3 text-xs text-gray-500">Tempo de máquina por unidade: {custos.tempoUnidadeMinutos.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} min.</p>}
-              {(custos.pendencias.length > 0 || errosNumericos.length > 0) && (
-                <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
-                  <p className="font-semibold">Pendências da estimativa</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">{[...new Set([...errosNumericos, ...custos.pendencias])].map(pendencia => <li key={pendencia}>{pendencia}</li>)}</ul>
+              {custos.pendencias.length > 0 && (
+                <details className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+                  <summary className="cursor-pointer font-semibold">Dados opcionais para completar a estimativa</summary>
+                  <p className="mt-2">Preencha quando quiser calcular todos os indicadores. A ausência desses dados não impede salvar o cadastro.</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">{custos.pendencias.map(pendencia => <li key={pendencia}>{pendencia}</li>)}</ul>
+                </details>
+              )}
+              {errosNumericos.length > 0 && (
+                <div role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">
+                  <p className="font-semibold">Confira os valores preenchidos</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">{errosNumericos.map(erro => <li key={erro}>{erro}</li>)}</ul>
                 </div>
               )}
             </section>

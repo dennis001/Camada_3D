@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react'
 import { ShoppingBag, Trash2 } from 'lucide-react'
 import { formatarMoeda } from '../lib/produtos.js'
+import { formatarTempoImpressao, resumirImpressao } from '../lib/producao.js'
 
 function totalItem(item) {
   const total = item.precoCentavos * item.quantidade
@@ -17,6 +18,7 @@ export default function Carrinho({ itens = [], onQuantidade, onRemover }) {
     return total !== null && valor !== null && Number.isSafeInteger(total + valor) ? total + valor : null
   }, 0)
   const indisponiveis = itens.some((item) => item.indisponivel)
+  const impressao = resumirImpressao(itens)
 
   function alterarQuantidade(item, quantidade) {
     const resultado = onQuantidade(item.chave, quantidade)
@@ -32,7 +34,7 @@ export default function Carrinho({ itens = [], onQuantidade, onRemover }) {
     <section id="carrinho" aria-labelledby="titulo-carrinho" className="scroll-mt-24 py-16 bg-camada-teal-50/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3 mb-3"><ShoppingBag size={28} className="text-camada-teal-700" aria-hidden="true" /><h2 id="titulo-carrinho" className="text-3xl font-bold text-camada-dark-900">Seu carrinho</h2></div>
-        <p className="text-gray-600 mb-8">Suas escolhas ficam salvas neste navegador. Adicionar ao carrinho não reserva estoque nem cria um pedido.</p>
+        <p className="text-gray-600 mb-8">Produzimos sob encomenda. Suas escolhas ficam salvas neste navegador; adicionar ao carrinho não cria um pedido nem reserva horário na produção.</p>
         {itens.length ? (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
             <div className="min-w-0 rounded-2xl border border-gray-200 bg-white overflow-hidden">
@@ -45,17 +47,16 @@ export default function Carrinho({ itens = [], onQuantidade, onRemover }) {
                       {item.sku && <p className="text-xs text-gray-500 mt-1 break-words">SKU: {item.sku}</p>}
                       {item.indisponivel ? (
                         <div className="text-sm text-red-700 mt-2">
-                          {item.estoqueSite > 0 && item.quantidade > item.estoqueSite ? (
-                            <><p>O estoque mudou. Há {item.estoqueSite} unidade(s) desta cor.</p><button type="button" onClick={() => alterarQuantidade(item, item.estoqueSite)} className="underline font-medium mt-1">Ajustar à quantidade disponível</button></>
-                          ) : <p>Este item ficou indisponível. Remova-o do carrinho.</p>}
+                          <p>Este produto ou cor saiu do catálogo. Remova-o do carrinho.</p>
                         </div>
                       ) : <p className="text-sm text-gray-600 mt-2">{formatarMoeda(item.precoCentavos)} por unidade</p>}
+                      {!item.indisponivel && <p className="mt-2 text-sm text-camada-teal-700">Impressão estimada: {formatarTempoImpressao(item.impressao?.minutos)}{item.impressao?.placas != null && ` · ${item.impressao.placas} lote(s)`}</p>}
                     </div>
                     <div className="flex flex-wrap items-center justify-between sm:justify-end gap-4">
                       <div className="inline-flex items-center rounded-lg border border-gray-300" role="group" aria-label={'Quantidade de ' + item.nome + ', ' + item.cor}>
                         <button type="button" onClick={() => alterarQuantidade(item, item.quantidade - 1)} disabled={item.indisponivel || item.quantidade <= 1} aria-label={'Diminuir quantidade de ' + item.nome + ', ' + item.cor} className="px-3 py-2 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">−</button>
                         <span className="min-w-[2rem] px-1 text-center text-sm font-medium" aria-live="polite">{item.quantidade}</span>
-                        <button type="button" onClick={() => alterarQuantidade(item, item.quantidade + 1)} disabled={item.indisponivel || item.quantidade >= item.estoqueSite} aria-label={'Aumentar quantidade de ' + item.nome + ', ' + item.cor} className="px-3 py-2 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">+</button>
+                        <button type="button" onClick={() => alterarQuantidade(item, item.quantidade + 1)} disabled={item.indisponivel} aria-label={'Aumentar quantidade de ' + item.nome + ', ' + item.cor} className="px-3 py-2 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">+</button>
                       </div>
                       <p className="font-semibold text-camada-dark-900 sm:min-w-[6rem] sm:text-right">{item.indisponivel ? '—' : formatarMoeda(totalItem(item))}</p>
                       <button type="button" onClick={() => remover(item.chave)} aria-label={'Remover ' + item.nome + ', ' + item.cor + ', do carrinho'} className="p-2 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded-lg"><Trash2 size={19} aria-hidden="true" /></button>
@@ -68,6 +69,13 @@ export default function Carrinho({ itens = [], onQuantidade, onRemover }) {
               <h3 className="font-semibold text-lg text-camada-dark-900 mb-5">Resumo</h3>
               <div className="flex justify-between gap-3 text-camada-dark-900"><span>Subtotal</span><strong>{formatarMoeda(subtotal)}</strong></div>
               <p className="text-sm text-gray-500 mt-2">Somente produtos. Frete ainda não calculado.</p>
+              <div className="mt-5 border-t pt-4" aria-live="polite">
+                <p className="font-medium text-gray-800">Produção sob encomenda</p>
+                <p className="mt-2 text-sm">Tempo estimado de impressão: <strong>{formatarTempoImpressao(impressao.minutos)}</strong></p>
+                {impressao.minutos == null ? <p className="mt-2 text-xs text-gray-600">Faltam dados de produção de algum item para calcular o tempo total.</p> : <p className="mt-2 text-xs text-gray-600">{impressao.placas} lote(s), considerando uma impressora e lotes separados por produto e cor. A estimativa aumenta ao precisar de uma nova placa.</p>}
+                <p className="mt-3 text-sm">Postagem: a definir conforme fila, jornada de produção e acabamento.</p>
+                <p className="mt-2 text-sm">Entrega: prazo de produção + transporte, ainda a calcular.</p>
+              </div>
               {indisponiveis && <p className="text-sm text-red-700 mt-3">Os itens indisponíveis não entram no subtotal.</p>}
               {subtotal === null && <p className="text-sm text-red-700 mt-3">Não foi possível calcular o subtotal. Revise as quantidades e os valores dos produtos.</p>}
               <button type="button" disabled className="mt-6 w-full rounded-lg bg-gray-200 text-gray-500 font-medium px-4 py-3 cursor-not-allowed">Compra ainda indisponível</button>
