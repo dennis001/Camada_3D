@@ -60,6 +60,7 @@ function ProdutoCard({ produto, onAdicionar }) {
       <div className="p-6 flex flex-col flex-1">
         <span className="self-start text-xs font-medium text-camada-teal-700 bg-camada-teal-50 rounded-full px-3 py-1 mb-3">{categoria?.nome || 'Produtos'}</span>
         <h3 className="text-xl font-semibold text-camada-dark-900 mb-2">{produto.nome}</h3>
+        {produto.emTeste && <p className="mb-3 text-sm font-medium text-amber-800">Prévia de teste</p>}
         <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">{produto.descricao}</p>
         <details className="text-sm my-4 border-y border-gray-100 py-3">
           <summary className="cursor-pointer font-medium text-camada-dark-900">Detalhes do produto</summary>

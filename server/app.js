@@ -14,9 +14,10 @@ const credentials = {
   properties: { username: { type: 'string', minLength: 1, maxLength: 254 }, password: { type: 'string', minLength: 1, maxLength: 128 } },
 }
 
-export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10 }) {
+export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10, catalogPreviewIds = [] }) {
   if (!['development', 'production'].includes(environment)) throw new Error('APP_ENV deve ser development ou production.')
   if (new URL(origin).origin !== origin || (production && !origin.startsWith('https://'))) throw new Error('APP_ORIGIN deve ser uma origem exata; produção exige HTTPS.')
+  if (catalogPreviewIds.length && (production || environment !== 'development' || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname))) throw new Error('Prévia de rascunhos é exclusiva do ambiente local de desenvolvimento.')
   const app = Fastify({ logger, bodyLimit: 5 * 1024 * 1024, trustProxy: false, ajv: { customOptions: { removeAdditional: false } } })
   await app.register(cookie)
   await app.register(rateLimit, { global: false, errorResponseBuilder: () => ({ statusCode: 429, error: 'Muitas tentativas. Aguarde um minuto antes de tentar novamente.' }) })
@@ -53,7 +54,7 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
   }
 
   app.get('/api/health', async () => { await pool.query('SELECT 1'); return { status: 'ok' } })
-  app.get('/api/catalogo', async () => ({ produtos: await publicCatalog(pool) }))
+  app.get('/api/catalogo', async () => ({ produtos: await publicCatalog(pool, catalogPreviewIds) }))
   app.post('/api/auth/register', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { body: {

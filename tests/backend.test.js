@@ -158,6 +158,22 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(shared.json().produtos[0].id, product.id)
       assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
     })
+    await t.test('prévia local mostra apenas rascunhos selecionados sem liberar produção ou dados privados', async () => {
+      const preview = await buildApp({ pool, origin, catalogPreviewIds: [product.id] })
+      try {
+        const items = (await preview.inject('/api/catalogo')).json().produtos
+        assert.equal(items.length, 1)
+        assert.equal(items[0].id, product.id)
+        assert.equal(items[0].emTeste, true)
+        assert.equal(items[0].ficha, undefined)
+        assert.equal(items[0].origem, undefined)
+        assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
+        assert.equal((await readCatalog(pool)).produtos[0].publicado, false)
+      } finally { await preview.close() }
+      for (const options of [{ production: true, origin: 'https://studiocamadas.com.br' }, { environment: 'production' }, { origin: 'https://dev.studiocamadas.com.br' }]) {
+        await assert.rejects(buildApp({ pool, origin, catalogPreviewIds: [product.id], ...options }), /exclusiva do ambiente local/)
+      }
+    })
     await t.test('publicação expõe só dados comerciais e guarda revisão e responsável', async () => {
       product.publicado = true
       const response = await save(talissa, product, 1)

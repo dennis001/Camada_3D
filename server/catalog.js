@@ -36,9 +36,9 @@ export async function readCatalog(pool) {
   const result = await pool.query("SELECT revision, COALESCE((SELECT jsonb_agg(data ORDER BY id) FROM products), '[]'::jsonb) AS produtos FROM catalog_state WHERE id=1")
   return result.rows[0]
 }
-export async function publicCatalog(pool) {
-  const result = await pool.query("SELECT data FROM products WHERE data->>'publicado'='true' ORDER BY id")
-  return result.rows.map(row => toProdutoPublico(row.data))
+export async function publicCatalog(pool, previewIds = []) {
+  const result = await pool.query("SELECT data FROM products WHERE data->>'publicado'='true' OR id=ANY($1::text[]) ORDER BY id", [previewIds])
+  return result.rows.map(row => ({ ...toProdutoPublico(row.data), ...(!row.data.publicado ? { emTeste: true } : {}) }))
 }
 export async function audit(client, actor, action, productId = null) {
   await client.query('INSERT INTO audit_events(id,actor_id,action,product_id) VALUES($1,$2,$3,$4)', [randomUUID(), actor, action, productId])

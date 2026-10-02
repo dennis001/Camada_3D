@@ -5,5 +5,5 @@ export function loadConfig() {
   if (production && !process.env.APP_ORIGIN) throw new Error('Configure APP_ORIGIN com o endereço HTTPS da aplicação.')
   const environment = process.env.APP_ENV || (production ? 'production' : 'development')
   if (!['development', 'production'].includes(environment)) throw new Error('APP_ENV deve ser development ou production.')
-  return { connectionString: process.env.DATABASE_URL, origin: process.env.APP_ORIGIN || 'http://127.0.0.1:3000', host: process.env.HOST || '127.0.0.1', port: Number(process.env.PORT || 3001), production, environment }
+  return { connectionString: process.env.DATABASE_URL, origin: process.env.APP_ORIGIN || 'http://127.0.0.1:3000', host: process.env.HOST || '127.0.0.1', port: Number(process.env.PORT || 3001), production, environment, catalogPreviewIds: (process.env.CATALOG_PREVIEW_IDS || '').split(',').map(id => id.trim()).filter(Boolean) }
 }
