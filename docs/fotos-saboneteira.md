@@ -21,5 +21,8 @@ Cada cor pode ter uma imagem opcional no cadastro administrativo. A galeria reú
 
 - [ ] Conferir as quatro simulações com as peças e cores reais antes de usar comercialmente.
 - [ ] Conferir setas, seleção de cores e inclusão no carrinho em desktop e celular.
+- [ ] Clicar na foto ou no nome do produto para abrir os detalhes ampliados; conferir descrição completa, medidas e galeria.
+- [ ] Fechar pelo botão, pela tecla Esc e clicando fora da janela; conferir retorno do foco ao botão que a abriu e desbloqueio da rolagem.
+- [ ] Adicionar pela janela e usar Ver carrinho; conferir que a janela fecha e o item mantém a cor selecionada.
 - [ ] Confirmar qual número representa L (largura), A (altura) e C (comprimento/profundidade) e a unidade de medida da saboneteira. Os valores atuais não foram reordenados por suposição.
 - [ ] Confirmar estoque das combinações novas; o administrador pode ajustar as quantidades por cor.
