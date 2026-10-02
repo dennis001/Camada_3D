@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Box, Search, ShoppingBag, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { estimarImpressao, formatarTempoImpressao } from '../lib/producao.js'
 import { categorias, formatarMoeda, normalizarTexto } from '../lib/produtos.js'
 
 function ImagemProduto({ src, nome }) {
@@ -24,12 +25,11 @@ function ProdutoCard({ produto, onAdicionar, onVerDetalhes, ampliado = false, on
   const [indiceFoto, setIndiceFoto] = useState(0)
   const [mensagem, setMensagem] = useState(null)
   const cores = produto.cores || []
-  const cor = cores.find((item) => item.id === corId) || cores.find((item) => item.estoqueSite > 0) || cores[0]
-  const estoque = cor?.estoqueSite || 0
+  const cor = cores.find((item) => item.id === corId) || cores[0]
   const categoria = categorias.find((item) => item.id === produto.categoriaId)
   const imagens = [...new Set([...(produto.imagens || []), ...cores.map(item => item.imagem).filter(Boolean)])]
   const imagem = imagens[indiceFoto] || imagens[0]
-  const quantidadeValida = Number.isInteger(Number(quantidade)) && Number(quantidade) >= 1 && Number(quantidade) <= estoque
+  const quantidadeValida = Boolean(cor) && Number.isSafeInteger(Number(quantidade)) && Number(quantidade) >= 1
 
   function selecionarCor(item) {
     setCorId(item.id); setQuantidade('1'); setMensagem(null)
@@ -45,7 +45,7 @@ function ProdutoCard({ produto, onAdicionar, onVerDetalhes, ampliado = false, on
   function adicionar(event) {
     event.preventDefault()
     if (!cor || !quantidadeValida) {
-      setMensagem({ ok: false, texto: 'Escolha uma cor disponível e uma quantidade dentro do estoque.' })
+      setMensagem({ ok: false, texto: 'Escolha uma cor e uma quantidade inteira maior que zero.' })
       return
     }
     const resultado = onAdicionar(produto.id, cor.id, Number(quantidade))
@@ -71,7 +71,7 @@ function ProdutoCard({ produto, onAdicionar, onVerDetalhes, ampliado = false, on
           <p className="mb-2 text-sm font-medium text-gray-700">Cor: {cor?.nome}</p>
           <div className="flex flex-wrap gap-2">{cores.map(item => (
             <button key={item.id} type="button" aria-pressed={cor?.id === item.id} onClick={() => selecionarCor(item)} className={'rounded-lg border px-3 py-2 text-xs ' + (cor?.id === item.id ? 'border-camada-teal-600 bg-camada-teal-50 text-camada-teal-700' : 'border-gray-300 text-gray-600')}>
-              {item.nome}{item.estoqueSite > 0 ? '' : ' — indisponível'}
+              {item.nome}
             </button>
           ))}</div>
         </div>
@@ -93,20 +93,21 @@ function ProdutoCard({ produto, onAdicionar, onVerDetalhes, ampliado = false, on
           </div>
         </details>
         <p className="text-2xl font-bold text-camada-teal-700 mb-4">{formatarMoeda(produto.precoCentavos)}</p>
+        <p className="mb-4 text-sm text-gray-600">Impressão para esta quantidade: {formatarTempoImpressao(estimarImpressao(Number(quantidade), produto.producao).minutos)}. O transporte é calculado separadamente.</p>
         <form onSubmit={adicionar} className="mt-auto space-y-4">
           {!cores.length && <p className="text-sm text-gray-600">Nenhuma cor cadastrada.</p>}
           <div className="flex gap-4 items-end">
             <div className="w-24 shrink-0">
               <label htmlFor={quantidadeId} className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
-              <input id={quantidadeId} type="number" inputMode="numeric" min="1" max={Math.max(1, estoque)} step="1" required value={quantidade}
-                disabled={!estoque} onChange={(event) => { setQuantidade(event.target.value); setMensagem(null) }}
+              <input id={quantidadeId} type="number" inputMode="numeric" min="1" step="1" required value={quantidade}
+                disabled={!cor} onChange={(event) => { setQuantidade(event.target.value); setMensagem(null) }}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100" />
             </div>
-            <p className="pb-2 text-sm text-gray-500">{estoque > 0 ? estoque + ' peça(s) pronta(s) nesta cor' : 'Cor sem estoque no site'}</p>
+            <p className="pb-2 text-sm text-gray-500">Produção sob encomenda</p>
           </div>
           <button type="submit" disabled={!quantidadeValida} className="w-full btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
             <ShoppingBag size={18} aria-hidden="true" />
-            {estoque > 0 ? 'Adicionar ao carrinho' : 'Indisponível'}
+            {cor ? 'Adicionar ao carrinho' : 'Indisponível'}
           </button>
           <div className="text-sm min-h-[1.25rem]" role="status" aria-live="polite">
             {mensagem && <p className={mensagem.ok ? 'text-camada-teal-700' : 'text-red-700'}>{mensagem.texto} {mensagem.ok && <a href="#carrinho" onClick={onVerCarrinho} className="underline font-medium">Ver carrinho</a>}</p>}
@@ -170,7 +171,7 @@ export default function Catalogo({ produtos = [], onAdicionar }) {
         <div className="mb-10 text-center">
           <p className="text-sm font-semibold tracking-widest uppercase text-camada-teal-700 mb-3">Feito camada por camada</p>
           <h2 id="titulo-catalogo" className="text-3xl font-bold text-camada-dark-900 mb-4">Catálogo de produtos</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">Conheça as peças, confira as medidas e escolha entre as cores com estoque disponível.</p>
+          <p className="text-gray-600 max-w-2xl mx-auto">Conheça as peças, confira as medidas e escolha a cor para produzir sob encomenda.</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-8">
           <div className="grid gap-4 md:grid-cols-3">

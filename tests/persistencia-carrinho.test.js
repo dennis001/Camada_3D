@@ -67,19 +67,20 @@ test('carrinho mantém cores distintas e total com centavos precisos', () => {
   assert.deepEqual(validarCarrinho(JSON.parse(JSON.stringify(itens))), itens)
 })
 
-test('carrinho impede quantidade inválida, cor inexistente e estoque excedido', () => {
-  for (const quantidade of [0, -1, 1.5, NaN, Infinity, '2', 4]) assert.throws(() => alterarQuantidade([], produtos, 'p', 'v', quantidade))
+test('carrinho impede quantidade inválida e cor inexistente, mas aceita encomenda acima do estoque antigo', () => {
+  for (const quantidade of [0, -1, 1.5, NaN, Infinity, '2']) assert.throws(() => alterarQuantidade([], produtos, 'p', 'v', quantidade))
+  assert.equal(alterarQuantidade([], produtos, 'p', 'v', 40)[0].quantidade, 40)
   assert.throws(() => alterarQuantidade([], produtos, 'p', 'inexistente', 1))
   assert.throws(() => validarCarrinho([{ produtoId: 'p', corId: 'v', quantidade: -1 }]))
   assert.throws(() => validarCarrinho([{ produtoId: 'p', corId: 'v', quantidade: 1 }, { produtoId: 'p', corId: 'v', quantidade: 2 }]))
 })
 
-test('carrinho sinaliza despublicação e redução de estoque sem apagar itens', () => {
+test('carrinho sinaliza despublicação sem bloquear encomendas por estoque antigo', () => {
   const itens = alterarQuantidade([], produtos, 'p', 'v', 3)
   assert.equal(detalharCarrinho(itens, [])[0].indisponivel, true)
   const atualizado = [{ ...produtos[0], precoCentavos: 500, cores: [{ ...produtos[0].cores[0], estoqueSite: 2 }] }]
   const detalhe = detalharCarrinho(itens, atualizado)[0]
-  assert.equal(detalhe.indisponivel, true)
+  assert.equal(detalhe.indisponivel, false)
   assert.equal(detalhe.precoCentavos, 500)
   assert.equal(detalhe.quantidade, 3)
   const corrigido = alterarQuantidade(itens, atualizado, 'p', 'v', 2)

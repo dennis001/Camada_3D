@@ -268,6 +268,10 @@ export function toProdutoPublico(produto) {
     precoCentavos: produto.precoCentavos,
     material: produto.material,
     medidas: produto.medidas,
+    producao: {
+      tempoPlacaMinutos: produto.ficha?.tempoPlacaMinutos ?? null,
+      unidadesPorPlaca: produto.ficha?.unidadesPorPlaca ?? null,
+    },
     imagens: [...produto.imagens],
     cores: produto.cores.map(({ id, sku, nome, estoqueSite, imagem }) => ({ id, sku, nome, estoqueSite, ...(imagem ? { imagem } : {}) })),
   }

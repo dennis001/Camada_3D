@@ -317,7 +317,7 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                 </div>
               </Secao>
 
-              <Secao titulo="Cores, SKU e estoque" descricao="Cada cor tem SKU e quantidade próprios. O controle de movimentações, reservas e sincronização com a Shopee será implementado nas próximas etapas.">
+              <Secao titulo="Cores e SKU" descricao="Os produtos são produzidos sob encomenda. Cada cor tem seu próprio SKU; a quantidade no carrinho não depende de estoque de peças prontas.">
                 <div className="space-y-4">
                   {formulario.cores.map((item, indice) => (
                     <div key={item.id} className="rounded-xl border border-gray-200 p-3 sm:p-4">
@@ -325,19 +325,18 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                       <div className="grid gap-3 sm:grid-cols-3">
                         <Campo rotulo={`Nome da cor ${indice + 1}`} value={item.nome} onChange={evento => cor(indice, 'nome', evento.target.value)} placeholder="Ex.: Branco" />
                         <Campo rotulo={`SKU da cor ${indice + 1}`} value={item.sku} onChange={evento => cor(indice, 'sku', evento.target.value)} placeholder="Ex.: NATAL-01-BR" />
-                        <Campo rotulo={`Estoque da cor ${indice + 1}`} inputMode="numeric" value={item.estoqueSite} onChange={evento => cor(indice, 'estoqueSite', evento.target.value)} dica="Quantidade inteira de unidades." />
                         <div className="sm:col-span-3"><Campo rotulo={`Imagem da cor ${indice + 1} (opcional)`} value={item.imagem || ''} onChange={evento => cor(indice, 'imagem', evento.target.value)} dica="URL ou caminho da imagem que será exibida ao escolher esta cor. Ela também aparece ao final da galeria." /></div>
                       </div>
                     </div>
                   ))}
-                  <button type="button" className={botaoSecundario} onClick={() => campo('cores', [...formulario.cores, { id: novoId(), nome: '', sku: '', estoqueSite: '' }])}><Plus size={16} aria-hidden="true" />Adicionar cor</button>
+                  <button type="button" className={botaoSecundario} onClick={() => campo('cores', [...formulario.cores, { id: novoId(), nome: '', sku: '', estoqueSite: '0' }])}><Plus size={16} aria-hidden="true" />Adicionar cor</button>
                 </div>
               </Secao>
 
               <Secao titulo="Ficha de impressão (opcional)" descricao="Preencha quando quiser estimar custos e rentabilidade. Estes dados não são obrigatórios para salvar ou publicar o produto. Consumo e tempo são da placa inteira; embalagem e outros custos são por unidade. Campos vazios não são considerados custo zero.">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Campo rotulo="Tempo de impressão da placa (min)" inputMode="decimal" placeholder="Ex.: 180" value={formulario.ficha.tempoPlacaMinutos} onChange={evento => ficha('tempoPlacaMinutos', evento.target.value)} />
-                  <Campo rotulo="Unidades por placa" inputMode="numeric" placeholder="Ex.: 4" value={formulario.ficha.unidadesPorPlaca} onChange={evento => ficha('unidadesPorPlaca', evento.target.value)} />
+                  <Campo rotulo="Tempo de impressão da placa (min)" inputMode="decimal" placeholder="Ex.: 180" value={formulario.ficha.tempoPlacaMinutos} onChange={evento => ficha('tempoPlacaMinutos', evento.target.value)} dica="Tempo total de uma placa com a quantidade abaixo. Usado na estimativa do carrinho, mesmo sem preencher os custos." />
+                  <Campo rotulo="Unidades por placa" inputMode="numeric" placeholder="Ex.: 4" value={formulario.ficha.unidadesPorPlaca} onChange={evento => ficha('unidadesPorPlaca', evento.target.value)} dica="Capacidade de um lote do mesmo produto e cor. Ex.: 5 peças com capacidade 4 exigem 2 placas." />
                 </div>
                 <div className="my-5 space-y-4">
                   {formulario.ficha.filamentos.map((item, indice) => (

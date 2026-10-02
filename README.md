@@ -18,6 +18,7 @@ Somente para testes neste computador, abra http://127.0.0.1:3000/login. Esse end
 
 - [Como usar, recuperar acesso e fazer backup](docs/backend.md)
 - [Domínio e ambientes de desenvolvimento e produção](docs/ambientes.md)
+- [Produção sob encomenda e estimativa por lotes](docs/producao-encomenda.md)
 - [Cadastro de clientes e roteiro de testes exploratórios](docs/cadastro-clientes.md)
 - [Planejamento por história e dependências do servidor](docs/plano-sem-servidor.md)
 
@@ -26,4 +27,4 @@ npm.cmd test
 npm.cmd run build -- --outDir output/validacao-build
 ```
 
-As histórias continuam em andamento para validação conjunta. Estoque operacional, pedidos, pagamentos e publicação no servidor serão desenvolvidos nas próximas etapas.
+As histórias continuam em andamento para validação conjunta. A loja opera sob encomenda, com estimativa de impressão por lotes. Fila de produção, prazo de postagem, frete, pedidos, pagamentos e publicação no servidor serão desenvolvidos nas próximas etapas.
