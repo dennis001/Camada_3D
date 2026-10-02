@@ -11,6 +11,7 @@
   
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
   }
   
   body {
@@ -36,4 +37,9 @@
   .gradient-text {
     @apply bg-gradient-to-r from-camada-dark-900 via-camada-teal-500 to-camada-dark-900 bg-clip-text text-transparent;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

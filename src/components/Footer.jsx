@@ -1,135 +1,40 @@
-import React from 'react'
-import { Instagram, Facebook, Twitter, Mail, Phone, MapPin, Clock } from 'lucide-react'
+﻿import React from 'react'
+import { Instagram, Mail } from 'lucide-react'
 import Logo from './Logo'
 
-const Footer = () => {
+export default function Footer() {
+  const links = [
+    { nome: 'Início', href: '#inicio' },
+    { nome: 'Catálogo', href: '#catalogo' },
+    { nome: 'Sobre o Studio', href: '#sobre' },
+    { nome: 'Carrinho', href: '#carrinho' },
+  ]
+
   return (
-    <footer id="contato" className="bg-camada-dark-900 text-white pt-16 pb-8">
+    <footer id="contato" className="scroll-mt-24 bg-camada-dark-900 text-white pt-12 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Main footer content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-          {/* Company Info */}
+        <div className="grid md:grid-cols-3 gap-10 mb-10">
           <div>
-            <div className="flex items-center gap-2 mb-6">
-              <Logo size="sm" showText={true} variant="light" />
-            </div>
-            <p className="text-gray-400 mb-6 leading-relaxed">
-              Transformando ideias em realidade com impressão 3D de alta qualidade. Qualidade, inovação e tecnologia.
-            </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-camada-teal-400 transition-colors">
-                <Instagram size={20} />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-camada-teal-400 transition-colors">
-                <Facebook size={20} />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-camada-teal-400 transition-colors">
-                <Twitter size={20} />
-              </a>
-            </div>
+            <Logo size="sm" showText variant="light" />
+            <p className="text-gray-300 leading-relaxed mt-3">Studio Camadas. Ideias que ganham forma, camada por camada.</p>
           </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-lg font-semibold mb-6">Links Rápidos</h3>
-            <ul className="space-y-3">
-              {['Início', 'Catálogo', 'Sobre Nós', 'Contato'].map((item) => (
-                <li key={item}>
-                  <a href={`#${item.toLowerCase().replace(' ', '')}`} className="text-gray-400 hover:text-camada-teal-400 transition-colors">{item}</a>
-                </li>
-              ))}
-            </ul>
+          <div className="md:pt-8">
+            <h2 className="text-lg font-semibold mb-5">Explore</h2>
+            <ul className="space-y-3">{links.map((link) => <li key={link.href}><a href={link.href} className="text-gray-300 hover:text-camada-teal-300">{link.nome}</a></li>)}</ul>
           </div>
-
-          {/* Contact Info */}
-          <div>
-            <h3 className="text-lg font-semibold mb-6">Contato</h3>
-            <ul className="space-y-4">
-              <li className="flex items-center gap-3">
-                <Mail size={18} className="text-camada-teal-500" />
-                <span className="text-gray-400">contato@printstore.com.br</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Phone size={18} className="text-camada-teal-500" />
-                <span className="text-gray-400">(11) 99999-9999</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <MapPin size={18} className="text-camada-teal-500 mt-1" />
-                <span className="text-gray-400">Rua 3D, 123 - São Paulo, SP</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Clock size={18} className="text-camada-teal-500" />
-                <span className="text-gray-400">Seg-Sex: 9h-18h</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Features */}
-          <div>
-            <h3 className="text-lg font-semibold mb-6">Nossa Especialidade</h3>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-camada-teal-500 flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
-                </div>
-                <span className="text-gray-400">Prototipagem Rápida</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-camada-dark-700 flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
-                </div>
-                <span className="text-gray-400">Garantia Estendida</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-camada-teal-500 flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
-                </div>
-                <span className="text-gray-400">Entrega Expressa</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-camada-dark-700 flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
-                </div>
-                <span className="text-gray-400">Suporte Técnico</span>
-              </li>
+          <div className="md:pt-8">
+            <h2 className="text-lg font-semibold mb-5">Fale com o Studio</h2>
+            <p className="text-sm text-gray-300 leading-relaxed mb-5">Nossos canais oficiais estão em preparação. Os contatos serão publicados aqui quando estiverem disponíveis.</p>
+            <ul className="grid grid-cols-2 gap-4 text-sm text-gray-400" aria-label="Canais ainda indisponíveis">
+              <li className="flex items-center gap-2"><Instagram size={20} aria-hidden="true" /><span>Instagram <span className="sr-only">indisponível</span></span></li>
+              <li className="flex items-center gap-2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3h3a5 5 0 0 0 5 5v3a8 8 0 0 1-5-1.75V16a6 6 0 1 1-6-6v3a3 3 0 1 0 3 3V3Z" /></svg><span>TikTok <span className="sr-only">indisponível</span></span></li>
+              <li className="flex items-center gap-2"><Mail size={20} aria-hidden="true" /><span>E-mail <span className="sr-only">indisponível</span></span></li>
+              <li className="flex items-center gap-2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a9 9 0 0 1-13.4 7.85L3 21l1.65-4.6A9 9 0 1 1 21 11.5Z" /><path d="m8.5 7 1.5 3-1.2 1.2a8 8 0 0 0 4 4L14 14l3 1.5c0 1.5-1 2.5-2.5 2.5C10 18 6 14 6 9.5 6 8 7 7 8.5 7Z" transform="translate(2 0) scale(.85)" /></svg><span>WhatsApp <span className="sr-only">indisponível</span></span></li>
             </ul>
           </div>
         </div>
-
-        {/* Benefits Banner */}
-        <div className="bg-gradient-to-r from-camada-dark-800 to-camada-teal-700 rounded-2xl p-8 mb-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-            <div className="text-white">
-              <h4 className="font-semibold mb-1">Material Ecológico</h4>
-              <p className="text-sm text-white/80">Reciclado e sustentável</p>
-            </div>
-            <div className="text-white">
-              <h4 className="font-semibold mb-1">Entrega Rápida</h4>
-              <p className="text-sm text-white/80">Até 48h para produções</p>
-            </div>
-            <div className="text-white">
-              <h4 className="font-semibold mb-1">Suporte Técnico</h4>
-              <p className="text-sm text-white/80">24/7 para dúvidas</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom bar */}
-        <div className="border-t border-gray-800 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-gray-400 text-sm mb-4 md:mb-0">
-              © 2026 CAMADA — Ideias que ganham forma. Todos os direitos reservados.
-            </div>
-            <div className="flex flex-wrap justify-center gap-6 text-sm">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">Política de Privacidade</a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">Termos de Serviço</a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">Política de Cookies</a>
-            </div>
-          </div>
-        </div>
+        <div className="border-t border-gray-700 pt-6 text-sm text-gray-400">© {new Date().getFullYear()} Studio Camadas — Ideias que ganham forma.</div>
       </div>
     </footer>
   )
 }
-
-export default Footer

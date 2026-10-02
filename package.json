@@ -3,21 +3,38 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": { "node": ">=24" },
   "scripts": {
+    "setup:local": "node scripts/setup-local.mjs",
+    "dev:full": "node scripts/dev-full.mjs",
+    "api:dev": "node --watch server/start.js",
+    "api:start": "node server/start.js",
+    "db:migrate": "node scripts/db-cli.mjs migrate",
+    "db:backup": "node scripts/db-cli.mjs backup",
+    "db:restore": "node scripts/db-cli.mjs restore",
+    "admin:setup": "node scripts/db-cli.mjs admins",
+    "admin:reset": "node scripts/db-cli.mjs reset",
+    "test:backend": "node --test --test-isolation=none tests/backend.test.js",
+    "test": "node --test --test-isolation=none tests/*.test.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/rate-limit": "10.3.0",
+    "fastify": "5.12.5",
+    "lucide-react": "^0.294.0",
+    "pg": "8.23.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.294.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.15",
+    "embedded-postgres": "18.4.0-beta.17",
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3",
     "vite": "^4.4.5"

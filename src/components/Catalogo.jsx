@@ -1,212 +1,175 @@
-import React, { useState } from 'react'
-import { produtos, categorias } from '../data/produtos'
-import { Search, Filter, ShoppingBag, ChevronDown, Star, Box } from 'lucide-react'
+﻿import React, { useMemo, useState } from 'react'
+import { Box, Search, ShoppingBag } from 'lucide-react'
+import { categorias, formatarMoeda, normalizarTexto } from '../lib/produtos.js'
 
-const Catalogo = () => {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('todos')
-  const [sortOption, setSortOption] = useState('padrao')
-  const [filteredProdutos, setFilteredProdutos] = useState(produtos)
+function ImagemProduto({ src, nome }) {
+  const [falhou, setFalhou] = useState(false)
 
-  React.useEffect(() => {
-    const filtered = produtos.filter(produto => {
-      const matchesSearch = produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           produto.descricao.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesCategory = selectedCategory === 'todos' || produto.categoria.toLowerCase() === selectedCategory
-      return matchesSearch && matchesCategory
-    })
+  if (!src || falhou) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500 bg-gray-100">
+        <Box size={36} aria-hidden="true" />
+        <span className="text-sm">Foto ainda não disponível</span>
+      </div>
+    )
+  }
 
-    let sorted = [...filtered]
-    switch (sortOption) {
-      case 'preco-asc':
-        sorted.sort((a, b) => {
-          const priceA = parseFloat(a.preco.replace('R$ ', '').replace(',', '.'))
-          const priceB = parseFloat(b.preco.replace('R$ ', '').replace(',', '.'))
-          return priceA - priceB
-        })
-        break
-      case 'preco-desc':
-        sorted.sort((a, b) => {
-          const priceA = parseFloat(a.preco.replace('R$ ', '').replace(',', '.'))
-          const priceB = parseFloat(b.preco.replace('R$ ', '').replace(',', '.'))
-          return priceB - priceA
-        })
-        break
-      case 'avaliacao':
-        sorted.sort((a, b) => b.avaliacao - a.avaliacao)
-        break
-      case 'novidade':
-        sorted.sort((a, b) => b.id - a.id)
-        break
-      default:
-        break
+  return <img src={src} alt={nome} loading="lazy" onError={() => setFalhou(true)} className="w-full h-full object-contain" />
+}
+
+function ProdutoCard({ produto, onAdicionar }) {
+  const [corId, setCorId] = useState('')
+  const [quantidade, setQuantidade] = useState('1')
+  const [indiceFoto, setIndiceFoto] = useState(0)
+  const [mensagem, setMensagem] = useState(null)
+  const cores = produto.cores || []
+  const cor = cores.find((item) => item.id === corId) || cores.find((item) => item.estoqueSite > 0) || cores[0]
+  const estoque = cor?.estoqueSite || 0
+  const categoria = categorias.find((item) => item.id === produto.categoriaId)
+  const imagens = produto.imagens || []
+  const imagem = imagens[indiceFoto] || imagens[0]
+  const quantidadeValida = Number.isInteger(Number(quantidade)) && Number(quantidade) >= 1 && Number(quantidade) <= estoque
+
+  function adicionar(event) {
+    event.preventDefault()
+    if (!cor || !quantidadeValida) {
+      setMensagem({ ok: false, texto: 'Escolha uma cor disponível e uma quantidade dentro do estoque.' })
+      return
     }
-    setFilteredProdutos(sorted)
-  }, [searchTerm, selectedCategory, sortOption])
+    const resultado = onAdicionar(produto.id, cor.id, Number(quantidade))
+    setMensagem(resultado.ok
+      ? { ok: true, texto: 'Produto adicionado ao carrinho.' }
+      : { ok: false, texto: resultado.erro || 'Não foi possível adicionar este produto.' })
+  }
 
   return (
-    <section id="catalogo" className="py-16 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-camada-dark-900 text-center mb-6">Catálogo de Produtos</h2>
-          <p className="text-center text-gray-600 max-w-3xl mx-auto">
-            Explore nossa coleção única de produtos impressos em 3D, feitos com materiais premium e design inovador.
-          </p>
+    <article className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+      <div className="h-56 bg-gray-50">
+        <ImagemProduto key={imagem || 'sem-foto'} src={imagem} nome={produto.nome} />
+      </div>
+      {imagens.length > 1 && (
+        <div className="flex flex-wrap justify-center gap-2 px-4 py-3" aria-label={'Fotos de ' + produto.nome}>
+          {imagens.map((src, indice) => (
+            <button key={src + '-' + indice} type="button" aria-label={'Ver foto ' + (indice + 1) + ' de ' + produto.nome} aria-pressed={imagem === src}
+              onClick={() => setIndiceFoto(indice)} className={'text-xs px-3 py-2 rounded-lg border ' + (imagem === src ? 'border-camada-teal-600 text-camada-teal-700 bg-camada-teal-50' : 'border-gray-300 text-gray-600')}>
+              Foto {indice + 1}
+            </button>
+          ))}
         </div>
-
-        {/* Filtros */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 items-end">
-            {/* Busca */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Buscar
-              </label>
-              <div className="relative flex items-center">
-                <Search size={18} className="absolute left-3 text-gray-400 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Buscar produtos..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
-                />
-              </div>
+      )}
+      <div className="p-6 flex flex-col flex-1">
+        <span className="self-start text-xs font-medium text-camada-teal-700 bg-camada-teal-50 rounded-full px-3 py-1 mb-3">{categoria?.nome || 'Produtos'}</span>
+        <h3 className="text-xl font-semibold text-camada-dark-900 mb-2">{produto.nome}</h3>
+        <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">{produto.descricao}</p>
+        <details className="text-sm my-4 border-y border-gray-100 py-3">
+          <summary className="cursor-pointer font-medium text-camada-dark-900">Detalhes do produto</summary>
+          <div className="pt-3 space-y-2 text-gray-600">
+            <p className="whitespace-pre-line">{produto.descricao}</p>
+            <p><strong className="font-medium">Material:</strong> {produto.material || 'A informar'}</p>
+            <p><strong className="font-medium">Medidas:</strong> {produto.medidas || 'A informar'}</p>
+            {cor?.sku && <p className="break-words"><strong className="font-medium">SKU da cor selecionada:</strong> {cor.sku}</p>}
+          </div>
+        </details>
+        <p className="text-2xl font-bold text-camada-teal-700 mb-4">{formatarMoeda(produto.precoCentavos)}</p>
+        <form onSubmit={adicionar} className="mt-auto space-y-4">
+          <div>
+            <label htmlFor={'cor-' + produto.id} className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
+            <select id={'cor-' + produto.id} value={cor?.id || ''} disabled={!cores.length}
+              onChange={(event) => { setCorId(event.target.value); setQuantidade('1'); setMensagem(null) }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white">
+              {!cores.length && <option value="">Nenhuma cor cadastrada</option>}
+              {cores.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.estoqueSite > 0 ? ' — ' + item.estoqueSite + ' disponível(is)' : ' — esgotada'}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-4 items-end">
+            <div className="w-24 shrink-0">
+              <label htmlFor={'quantidade-' + produto.id} className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
+              <input id={'quantidade-' + produto.id} type="number" inputMode="numeric" min="1" max={Math.max(1, estoque)} step="1" required value={quantidade}
+                disabled={!estoque} onChange={(event) => { setQuantidade(event.target.value); setMensagem(null) }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100" />
             </div>
+            <p className="pb-2 text-sm text-gray-500">{estoque > 0 ? estoque + ' peça(s) pronta(s) nesta cor' : 'Cor sem estoque no site'}</p>
+          </div>
+          <button type="submit" disabled={!quantidadeValida} className="w-full btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+            <ShoppingBag size={18} aria-hidden="true" />
+            {estoque > 0 ? 'Adicionar ao carrinho' : 'Indisponível'}
+          </button>
+          <div className="text-sm min-h-[1.25rem]" role="status" aria-live="polite">
+            {mensagem && <p className={mensagem.ok ? 'text-camada-teal-700' : 'text-red-700'}>{mensagem.texto} {mensagem.ok && <a href="#carrinho" className="underline font-medium">Ver carrinho</a>}</p>}
+          </div>
+        </form>
+      </div>
+    </article>
+  )
+}
 
-            {/* Categoria */}
+export default function Catalogo({ produtos = [], onAdicionar }) {
+  const [busca, setBusca] = useState('')
+  const [categoriaId, setCategoriaId] = useState('todos')
+  const [ordem, setOrdem] = useState('padrao')
+  const filtrados = useMemo(() => {
+    const termo = normalizarTexto(busca.trim())
+    const resultado = produtos.filter((produto) => {
+      const correspondeBusca = normalizarTexto(produto.nome + ' ' + produto.descricao).includes(termo)
+      return correspondeBusca && (categoriaId === 'todos' || produto.categoriaId === categoriaId)
+    })
+    if (ordem === 'preco-asc') resultado.sort((a, b) => a.precoCentavos - b.precoCentavos)
+    if (ordem === 'preco-desc') resultado.sort((a, b) => b.precoCentavos - a.precoCentavos)
+    if (ordem === 'nome') resultado.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    return resultado
+  }, [produtos, busca, categoriaId, ordem])
+
+  function limparFiltros() {
+    setBusca('')
+    setCategoriaId('todos')
+    setOrdem('padrao')
+  }
+
+  return (
+    <section id="catalogo" className="scroll-mt-24 py-16 bg-gray-50" aria-labelledby="titulo-catalogo">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-10 text-center">
+          <p className="text-sm font-semibold tracking-widest uppercase text-camada-teal-700 mb-3">Feito camada por camada</p>
+          <h2 id="titulo-catalogo" className="text-3xl font-bold text-camada-dark-900 mb-4">Catálogo de produtos</h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">Conheça as peças, confira as medidas e escolha entre as cores com estoque disponível.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-8">
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Categoria
-              </label>
+              <label htmlFor="busca-produtos" className="block text-sm font-medium text-gray-700 mb-2">Buscar produto</label>
               <div className="relative">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full appearance-none px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200 bg-white cursor-pointer"
-                >
-                  {categorias.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.icone} {cat.nome}
-                    </option>
-                  ))}
-                </select>
-                <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <Search size={18} className="absolute left-3 top-3 text-gray-400" aria-hidden="true" />
+                <input id="busca-produtos" type="search" placeholder="Nome ou descrição" value={busca} onChange={(event) => setBusca(event.target.value)}
+                  className="scroll-mt-28 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg" />
               </div>
             </div>
-
-            {/* Ordenação */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ordenar por
-              </label>
-              <div className="relative">
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value)}
-                  className="w-full appearance-none px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200 bg-white cursor-pointer"
-                >
-                  <option value="padrao">Padrão</option>
-                  <option value="preco-asc">Preço: menor para maior</option>
-                  <option value="preco-desc">Preço: maior para menor</option>
-                  <option value="avaliacao">Melhor avaliado</option>
-                  <option value="novidade">Novidades primeiro</option>
-                </select>
-                <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              <label htmlFor="categoria-produtos" className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+              <select id="categoria-produtos" value={categoriaId} onChange={(event) => setCategoriaId(event.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <option value="todos">Todas as categorias</option>
+                {categorias.filter((categoria) => categoria.id !== 'todos').map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}
+              </select>
             </div>
-
-            {/* Resultado da busca */}
-            <div className="flex items-center justify-end pb-2 text-sm text-gray-600">
-              <span>{filteredProdutos.length} produto{filteredProdutos.length !== 1 ? 's' : ''} encontrado{filteredProdutos.length !== 1 ? 's' : ''}</span>
+            <div>
+              <label htmlFor="ordem-produtos" className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
+              <select id="ordem-produtos" value={ordem} onChange={(event) => setOrdem(event.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <option value="padrao">Ordem do catálogo</option>
+                <option value="preco-asc">Menor preço</option>
+                <option value="preco-desc">Maior preço</option>
+                <option value="nome">Nome: A a Z</option>
+              </select>
             </div>
           </div>
+          <p className="mt-4 text-sm text-gray-500" aria-live="polite">{filtrados.length} produto(s) encontrado(s)</p>
         </div>
-
-        {/* Grid de produtos */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredProdutos.length > 0 ? (
-            filteredProdutos.map((produto) => (
-              <div key={produto.id} className="group relative">
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                  {/* Imagem */}
-                  <div className="relative h-48 overflow-hidden">
-                    <img 
-                      src={produto.imagens[0]} 
-                      alt={produto.nome} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    {/* Badge de estoque */}
-                    {!produto.estoque && (
-                      <div className="absolute top-4 left-4 bg-camada-dark-700 text-white text-xs font-medium px-2 py-1 rounded">
-                        Indisponível
-                      </div>
-                    )}
-                    {/* Badge de destaque */}
-                    {produto.avaliacao >= 4.8 && (
-                      <div className="absolute top-4 right-4 bg-gradient-to-r from-camada-teal-500 to-camada-dark-900 text-white text-xs font-medium px-2 py-1 rounded">
-                        <Star size={14} className="mr-1" /> Destaque
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Informações do produto */}
-                  <div className="p-6">
-                    <div className="mb-2 flex justify-between items-start">
-                      <span className="text-xs text-camada-teal-600 bg-camada-teal-50 px-2 py-1 rounded">{produto.categoria}</span>
-                      <span className="text-xs text-gray-500">{produto.material} • {produto.impressao}</span>
-                    </div>
-                    
-                    <h3 className="text-lg font-medium text-camada-dark-900 mb-3 line-clamp-2">{produto.nome}</h3>
-                    
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                      {produto.descricao}
-                    </p>
-                    
-                    <div className="mb-4 flex justify-between items-center">
-                      <div className="text-2xl font-bold text-camada-teal-600">{produto.preco}</div>
-                      <div className="flex items-center space-x-1">
-                        {[1,2,3,4,5].map((star) => (
-                          <Star 
-                            key={star} 
-                            size={14} 
-                            fill={star <= Math.floor(produto.avaliacao) ? 'currentColor' : 'none'} 
-                            stroke={star <= Math.floor(produto.avaliacao) ? 'currentColor' : 'none'}
-                            className={star <= Math.floor(produto.avaliacao) ? 'text-yellow-400' : 'text-gray-300'}
-                          />
-                        ))}
-                        <span className="text-xs text-gray-500 ml-1">({produto.avaliacao})</span>
-                      </div>
-                    </div>
-                    
-                    <button 
-                      onClick={() => alert('Produto adicionado ao carrinho!')}
-                      className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!produto.estoque}
-                    >
-                      {produto.estoque ? 'Adicionar ao Carrinho' : 'Indisponível'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-12">
-              <p className="text-gray-500">Nenhum produto encontrado com os filtros aplicados.</p>
-            </div>
-          )}
-        </div>
-        
-        {/* Mostrar mais botão */}
-        {filteredProdutos.length > 0 && (
-          <div className="mt-12 text-center">
-            <button className="btn-secondary px-8 py-3">
-              Ver Mais Produtos
-            </button>
+        {filtrados.length > 0 ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{filtrados.map((produto) => <ProdutoCard key={produto.id} produto={produto} onAdicionar={onAdicionar} />)}</div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
+            <Box size={36} className="mx-auto mb-4 text-camada-teal-600" aria-hidden="true" />
+            <h3 className="text-xl font-semibold text-camada-dark-900 mb-2">{produtos.length ? 'Nenhum produto encontrado' : 'Nosso catálogo está em preparação'}</h3>
+            <p className="text-gray-600 max-w-lg mx-auto">{produtos.length ? 'Tente outro nome ou escolha uma categoria diferente.' : 'As peças aparecerão aqui conforme forem cadastradas e liberadas para o catálogo.'}</p>
+            {produtos.length > 0 && <button type="button" onClick={limparFiltros} className="btn-secondary mt-6">Limpar filtros</button>}
           </div>
         )}
       </div>
@@ -214,5 +177,3 @@ const Catalogo = () => {
   )
 }
 
-export default Catalogo
-        

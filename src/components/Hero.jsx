@@ -1,96 +1,30 @@
-import React from 'react'
-import { ArrowRight, CheckCircle, Star, Sparkles, Layers3 } from 'lucide-react'
-import Logo from './Logo'
+﻿import React from 'react'
+import { ArrowRight, Box, Layers, Palette } from 'lucide-react'
 
-const Hero = () => {
+export default function Hero() {
   return (
     <section id="inicio" className="relative pt-20 overflow-hidden bg-gradient-to-br from-white via-gray-50 to-camada-teal-50">
-      <div className="absolute top-20 right-0 w-96 h-96 bg-camada-teal-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-pulse"></div>
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-camada-teal-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-pulse"></div>
-      
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 lg:pt-32 lg:pb-32">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          <div className="text-center lg:text-left animate-slide-up">
-            {/* <div className="inline-flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-md mb-8">
-              <Layers3 size={16} className="text-camada-teal-600" />
-              <span className="text-sm font-medium text-gray-700">Tecnologia de impressão 3D</span>
-            </div> */}
-            
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-camada-dark-900 leading-tight mb-6">
-              Ideias que ganham
-              <span className="gradient-text"> forma </span>
-            </h1>
-            
-            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              Transformamos seus projetos em produtos de alta qualidade com impressão 3D. 
-              Personalização, precisão e rapidez em cada peça criada especialmente para você.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
-              <a href="#catalogo" className="btn-primary inline-flex items-center justify-center gap-2">
-                Explorar Catálogo
-                <ArrowRight size={18} />
-              </a>
-              <a href="#sobre" className="btn-secondary inline-flex items-center justify-center">
-                Como Funciona
-              </a>
+      <div className="absolute top-20 right-0 w-96 h-96 bg-camada-teal-100 rounded-full blur-3xl opacity-60" aria-hidden="true" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20 lg:py-28">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="text-center lg:text-left">
+            <p className="text-sm uppercase tracking-widest font-semibold text-camada-teal-700 mb-5">Studio Camadas · Impressão 3D</p>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-camada-dark-900 leading-tight mb-6">Ideias que ganham <span className="gradient-text">forma</span></h1>
+            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">Peças impressas em 3D para fazer parte do seu dia. Explore os modelos do catálogo e encontre a cor que combina com você.</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <a href="#catalogo" className="btn-primary inline-flex items-center justify-center gap-2">Explorar catálogo <ArrowRight size={18} aria-hidden="true" /></a>
+              <a href="#sobre" className="btn-secondary inline-flex items-center justify-center">Conheça o Studio</a>
             </div>
-            
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-gray-500">
-              <div className="flex items-center gap-2">
-                <CheckCircle size={18} className="text-camada-teal-600" />
-                <span>Entrega rápida</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle size={18} className="text-camada-teal-600" />
-                <span>Alta qualidade</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star size={18} className="text-yellow-400 fill-yellow-400" />
-                <span>4.9/5 avaliações</span>
-              </div>
-            </div>
+            <p className="text-sm text-gray-500 mt-6">Catálogo em preparação. As compras ainda não estão disponíveis.</p>
           </div>
-          
-          <div className="relative animate-float">
-            <div className="relative rounded-3xl bg-gradient-to-br from-camada-teal-400 via-camada-teal-500 to-camada-dark-900 p-8 shadow-2xl transform rotate-3 hover:rotate-0 transition-transform duration-500">
-              <div className="bg-white/95 rounded-2xl p-8 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-camada-dark-900">Nova Coleção</h3>
-                    <p className="text-sm text-gray-500">Peças exclusivas em 3D</p>
-                  </div>
-                  <div className="w-12 h-12 bg-camada-teal-50 rounded-full flex items-center justify-center">
-                    <Sparkles size={24} className="text-camada-teal-600" />
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                    <div className="w-12 h-12 bg-camada-dark-900 rounded-lg"></div>
-                    <div className="flex-1">
-                      <div className="h-3 bg-gray-200 rounded mb-2 w-3/4"></div>
-                      <div className="h-2 bg-gray-100 rounded w-1/2"></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                    <div className="w-12 h-12 bg-camada-teal-500 rounded-lg"></div>
-                    <div className="flex-1">
-                      <div className="h-3 bg-gray-200 rounded mb-2 w-2/3"></div>
-                      <div className="h-2 bg-gray-100 rounded w-1/3"></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                    <div className="w-12 h-12 bg-camada-dark-900 rounded-lg"></div>
-                    <div className="flex-1">
-                      <div className="h-3 bg-gray-200 rounded mb-2 w-1/2"></div>
-                      <div className="h-2 bg-gray-100 rounded w-2/3"></div>
-                    </div>
-                  </div>
-                </div>
-                
-                <button className="w-full mt-6 btn-primary">Ver Produtos</button>
+          <div className="rounded-3xl bg-gradient-to-br from-camada-teal-400 via-camada-teal-500 to-camada-dark-900 p-5 sm:p-8 shadow-xl">
+            <div className="rounded-2xl bg-white p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-8"><Layers className="text-camada-teal-600" size={28} aria-hidden="true" /><h2 className="text-xl font-semibold text-camada-dark-900">Cada peça, uma nova forma</h2></div>
+              <div className="space-y-5">
+                <div className="flex gap-4 p-4 rounded-xl bg-gray-50"><Box size={24} className="text-camada-teal-600 shrink-0" aria-hidden="true" /><div><h3 className="font-medium text-camada-dark-900">Conheça os modelos</h3><p className="text-sm text-gray-600 mt-1">Fotos, materiais e medidas em cada produto.</p></div></div>
+                <div className="flex gap-4 p-4 rounded-xl bg-gray-50"><Palette size={24} className="text-camada-teal-600 shrink-0" aria-hidden="true" /><div><h3 className="font-medium text-camada-dark-900">Escolha sua cor</h3><p className="text-sm text-gray-600 mt-1">Confira as opções disponíveis para cada peça.</p></div></div>
               </div>
+              <a href="#catalogo" className="mt-7 inline-flex items-center gap-2 font-semibold text-camada-teal-700">Ver produtos <ArrowRight size={18} aria-hidden="true" /></a>
             </div>
           </div>
         </div>
@@ -98,5 +32,3 @@ const Hero = () => {
     </section>
   )
 }
-
-export default Hero

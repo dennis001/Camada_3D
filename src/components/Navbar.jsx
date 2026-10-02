@@ -1,80 +1,60 @@
-import React, { useState } from 'react'
+﻿import React, { useRef, useState } from 'react'
 import { Menu, X, ShoppingBag, Search } from 'lucide-react'
 import Logo from './Logo'
+import { podeAdministrar } from '../lib/acesso'
 
-const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  const navLinks = [
-    { name: 'Início', href: '#inicio' },
-    { name: 'Catálogo', href: '#catalogo' },
-    { name: 'Sobre', href: '#sobre' },
-    { name: 'Contato', href: '#contato' },
+export default function Navbar({ quantidadeCarrinho = 0, user = null }) {
+  const [aberto, setAberto] = useState(false)
+  const botaoMenu = useRef(null)
+  const links = [
+    { nome: 'Início', href: '#inicio' },
+    { nome: 'Catálogo', href: '#catalogo' },
+    { nome: 'Sobre', href: '#sobre' },
+    { nome: 'Contato', href: '#contato' },
+    ...(podeAdministrar(user) ? [{ nome: 'Administração', href: '/admin' }] : []),
+    { nome: user ? 'Minha conta' : 'Entrar', href: '/login' },
   ]
 
+  function buscar(event) {
+    event.preventDefault()
+    setAberto(false)
+    window.location.hash = 'busca-produtos'
+    document.getElementById('busca-produtos')?.focus({ preventScroll: true })
+  }
+
+  function fecharComEscape(event) {
+    if (event.key === 'Escape' && aberto) {
+      setAberto(false)
+      botaoMenu.current?.focus()
+    }
+  }
+
   return (
-    <nav className="fixed w-full bg-white/95 backdrop-blur-md shadow-sm z-50 transition-all duration-300">
+    <nav aria-label="Navegação principal" onKeyDown={fecharComEscape} className="fixed inset-x-0 top-0 bg-white/95 backdrop-blur-md shadow-sm z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          <a href="#inicio">
-            <Logo size="md" showText={true} variant="dark" />
-          </a>
-          <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-gray-600 hover:text-camada-teal-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-              >
-                {link.name}
-              </a>
-            ))}
+        <div className="flex justify-between items-center h-20 gap-3">
+          <a href="#inicio" onClick={() => setAberto(false)} aria-label="Studio Camadas — Início"><Logo size="md" showText variant="dark" /></a>
+          <div className="hidden lg:flex items-center gap-2">
+            {links.map((link) => <a key={link.href} href={link.href} className="text-gray-600 hover:text-camada-teal-700 px-3 py-2 rounded-md text-sm font-medium">{link.nome}</a>)}
           </div>
-          <div className="hidden md:flex items-center space-x-4">
-            <button className="p-2 text-gray-600 hover:text-camada-teal-600 transition-colors">
-              <Search size={20} />
-            </button>
-            <button className="p-2 text-gray-600 hover:text-camada-teal-600 transition-colors relative">
-              <ShoppingBag size={20} />
-              <span className="absolute -top-1 -right-1 bg-camada-teal-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                3
-              </span>
-            </button>
-            <button className="btn-primary !py-2 !px-5 !text-sm">
-              Entrar
-            </button>
-          </div>
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-camada-teal-600 hover:bg-gray-100 focus:outline-none"
-            >
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+          <div className="flex items-center gap-3">
+            <a href="#busca-produtos" onClick={buscar} aria-label="Buscar produtos" className="p-2 text-gray-600 hover:text-camada-teal-700"><Search size={21} aria-hidden="true" /></a>
+            <a href="#carrinho" onClick={() => setAberto(false)} aria-label={'Carrinho: ' + quantidadeCarrinho + ' item(ns)'} className="p-2 text-gray-600 hover:text-camada-teal-700 relative mr-2">
+              <ShoppingBag size={21} aria-hidden="true" />
+              <span aria-hidden="true" className="absolute -top-1 -right-2 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-camada-teal-600 text-white text-xs font-semibold">{quantidadeCarrinho}</span>
+            </a>
+            <button ref={botaoMenu} type="button" onClick={() => setAberto(!aberto)} aria-expanded={aberto} aria-controls="menu-mobile" aria-label={aberto ? 'Fechar menu' : 'Abrir menu'} className="lg:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100">
+              {aberto ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
             </button>
           </div>
         </div>
       </div>
-      {isOpen && (
-        <div className="md:hidden bg-white border-t">
-          <div className="px-4 pt-2 pb-6 space-y-1">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="block px-3 py-3 text-base font-medium text-gray-700 hover:text-camada-teal-600 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                {link.name}
-              </a>
-            ))}
-            <div className="pt-4 flex flex-col space-y-3">
-              <button className="w-full btn-primary text-center">Entrar</button>
-            </div>
-          </div>
+      <div id="menu-mobile" hidden={!aberto} className="lg:hidden bg-white border-t">
+        <div className="px-4 pt-2 pb-5 space-y-1">
+          {links.map((link) => <a key={link.href} href={link.href} onClick={() => setAberto(false)} className="block px-3 py-3 font-medium text-gray-700 hover:bg-gray-50 rounded-md">{link.nome}</a>)}
+          <a href="#carrinho" onClick={() => setAberto(false)} className="block px-3 py-3 font-medium text-camada-teal-700">Carrinho ({quantidadeCarrinho})</a>
         </div>
-      )}
+      </div>
     </nav>
   )
 }
-
-export default Navbar

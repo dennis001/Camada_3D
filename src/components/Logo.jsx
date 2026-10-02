@@ -2,15 +2,15 @@ import React from 'react'
 
 const Logo = ({ size = 'md', showText = true, variant = 'dark' }) => {
   const sizes = {
-    sm: 'h-16 w-16',
-    md: 'h-20 w-20',
-    lg: 'h-28 w-28',
+    sm: 'h-40 w-48',
+    md: 'h-20 w-24',
+    lg: 'h-56 w-64',
   }
 
   return (
     <img
-      src="/logo-camada.png"
-      alt="CAMADA - Ideias que ganham forma"
+      src="/logo-studio-camadas.jpeg"
+      alt="Studio Camadas — Ideias que ganham forma"
       className={`${sizes[size]} object-contain`}
     />
   )

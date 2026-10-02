@@ -1,0 +1,33 @@
+# Exemplo para quando o servidor e o acesso público estiverem disponíveis.
+# DEV_USER e DEV_PASSWORD_HASH devem ser configurados no serviço Caddy.
+# Gerar hash com: caddy hash-password (não usar senha em texto neste arquivo).
+
+www.studiocamadas.com.br {
+    redir https://studiocamadas.com.br{uri} permanent
+}
+
+studiocamadas.com.br {
+    root * /srv/studio/production/frontend
+    handle /api/* {
+        reverse_proxy 127.0.0.1:3001
+    }
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+dev.studiocamadas.com.br {
+    root * /srv/studio/development/frontend
+    header X-Robots-Tag "noindex, nofollow"
+    basic_auth {
+        {$DEV_USER} {$DEV_PASSWORD_HASH}
+    }
+    handle /api/* {
+        reverse_proxy 127.0.0.1:3002
+    }
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
