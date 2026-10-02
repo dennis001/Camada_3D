@@ -100,6 +100,35 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
         assert.equal((await app.inject('/api/catalogo')).statusCode, 200)
       } finally { await pool.query("UPDATE admins SET role='admin' WHERE username='dennis'") }
     })
+    await t.test('cadastro público cria cliente persistente sem acesso administrativo', async () => {
+      const payload = { name: 'Cliente Teste', email: ' CLIENTE@example.test ', password: token() }
+      const register = body => app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload: body })
+      assert.equal((await register({ ...payload, role: 'admin' })).statusCode, 400)
+      assert.equal((await register({ ...payload, email: 'dennis' })).statusCode, 400)
+      assert.equal((await app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin: 'https://intruso.invalid' }, payload })).statusCode, 403)
+      const response = await register(payload)
+      assert.equal(response.statusCode, 201, response.body)
+      assert.equal(response.body.includes(payload.password), false)
+      const customer = await login('cliente@EXAMPLE.test', payload.password)
+      assert.equal(customer.user.role, 'customer')
+      assert.equal(customer.user.mustChangePassword, false)
+      for (const url of ['/api/admin/produtos', '/api/admin/historico']) assert.equal((await app.inject({ url, headers: headers(customer) })).statusCode, 403)
+      assert.equal((await save(customer, fixture(), 0)).statusCode, 403)
+      assert.equal((await register({ ...payload, email: 'cliente@example.test' })).statusCode, 409)
+      const stored = (await pool.query("SELECT * FROM admins WHERE username='cliente@example.test'")).rows[0]
+      assert.notEqual(stored.password_hash, payload.password)
+      assert.equal((await pool.query("SELECT count(*)::int AS count FROM admins WHERE username='cliente@example.test'")).rows[0].count, 1)
+      assert.equal((await app.inject({ method: 'POST', url: '/api/auth/logout', headers: headers(customer) })).statusCode, 200)
+      assert.equal((await app.inject({ url: '/api/auth/me', headers: headers(customer) })).statusCode, 401)
+    })
+    await t.test('cadastro rejeita dados inválidos e limita tentativas', async () => {
+      const limited = await buildApp({ pool, origin })
+      try {
+        const payload = { name: '  ', email: 'invalido', password: token() }
+        for (let i = 0; i < 5; i++) assert.equal((await limited.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload })).statusCode, 400)
+        assert.equal((await limited.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload })).statusCode, 429)
+      } finally { await limited.close() }
+    })
     await t.test('sessões e origens de desenvolvimento não são aceitas em produção', async () => {
       const prod = await buildApp({ pool, origin: 'https://studiocamadas.com.br', production: true, environment: 'production' })
       try {
@@ -208,7 +237,8 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       await migrate(restored)
       await restoreDatabase(restored, JSON.parse(JSON.stringify(snapshot)))
       assert.deepEqual(await readCatalog(restored), await readCatalog(pool))
-      assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 2)
+      assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 3)
+      assert.equal((await restored.query("SELECT role FROM admins WHERE username='cliente@example.test'")).rows[0].role, 'customer')
       assert.equal((await restored.query('SELECT * FROM sessions')).rowCount, 0)
       assert.equal((await restored.query('SELECT * FROM product_revisions')).rowCount, (await pool.query('SELECT * FROM product_revisions')).rowCount)
       await assert.rejects(restoreDatabase(restored, snapshot), /banco vazio/)

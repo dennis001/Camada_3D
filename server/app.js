@@ -5,11 +5,12 @@ import { hashPassword, verifyPassword, token, digest, sameToken, validPassword }
 import { transaction } from './db.js'
 import { audit, fail, publicCatalog, readCatalog, saveCatalog } from './catalog.js'
 import { podeAdministrar } from '../src/lib/acesso.js'
+import { randomUUID } from 'node:crypto'
 
 const userView = row => ({ id: row.id, username: row.username, name: row.name, role: row.role, mustChangePassword: row.must_change_password })
 const credentials = {
   type: 'object', additionalProperties: false, required: ['username', 'password'],
-  properties: { username: { type: 'string', minLength: 1, maxLength: 80 }, password: { type: 'string', minLength: 1, maxLength: 128 } },
+  properties: { username: { type: 'string', minLength: 1, maxLength: 254 }, password: { type: 'string', minLength: 1, maxLength: 128 } },
 }
 
 export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10 }) {
@@ -52,6 +53,31 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
 
   app.get('/api/health', async () => { await pool.query('SELECT 1'); return { status: 'ok' } })
   app.get('/api/catalogo', async () => ({ produtos: await publicCatalog(pool) }))
+  app.post('/api/auth/register', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    schema: { body: {
+      type: 'object', additionalProperties: false, required: ['name', 'email', 'password'],
+      properties: {
+        name: { type: 'string', minLength: 2, maxLength: 120 },
+        email: { type: 'string', minLength: 3, maxLength: 254 },
+        password: { type: 'string', minLength: 12, maxLength: 128 },
+      },
+    } },
+  }, async (request, reply) => {
+    const name = request.body.name.trim()
+    const email = request.body.email.trim().toLowerCase()
+    if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validPassword(request.body.password)) {
+      throw fail(400, 'Informe nome, e-mail válido e senha com 12 a 128 caracteres.')
+    }
+    const passwordHash = await hashPassword(request.body.password)
+    await transaction(pool, async client => {
+      // A tabela de identidades mantém seu nome original. O perfil nunca vem do cliente.
+      const created = await client.query("INSERT INTO admins(id,username,name,password_hash,role,must_change_password) VALUES($1,$2,$3,$4,'customer',false) ON CONFLICT(username) DO NOTHING RETURNING id", [randomUUID(), email, name, passwordHash])
+      if (!created.rowCount) throw fail(409, 'Não foi possível criar a conta com esse e-mail. Tente entrar ou solicite ajuda para recuperar o acesso.')
+      await audit(client, created.rows[0].id, 'auth.customer_registered')
+    })
+    return reply.code(201).send({ ok: true })
+  })
   app.post('/api/auth/login', { schema: { body: credentials }, config: { rateLimit: { max: loginMax, timeWindow: '1 minute' } } }, async (request, reply) => {
     const username = request.body.username.trim().toLowerCase()
     const result = await transaction(pool, async client => {
