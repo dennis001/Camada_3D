@@ -149,6 +149,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     })
     await t.test('salvar rascunho persiste no banco compartilhado e exige CSRF', async () => {
       product = fixture()
+      product.cores[0].imagem = '/produtos/teste/verde.png'
       const denied = await app.inject({ method: 'PUT', url: `/api/admin/produtos/${product.id}`, headers: { origin, cookie: dennis.cookie }, payload: { produto: product, revision: 0 } })
       assert.equal(denied.statusCode, 403)
       const saved = await save(dennis, product, 0)
@@ -156,6 +157,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(saved.json().revision, 1)
       const shared = await app.inject({ url: '/api/admin/produtos', headers: headers(talissa) })
       assert.equal(shared.json().produtos[0].id, product.id)
+      assert.equal(shared.json().produtos[0].cores[0].imagem, '/produtos/teste/verde.png')
       assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
     })
     await t.test('prévia local mostra apenas rascunhos selecionados sem liberar produção ou dados privados', async () => {
@@ -182,6 +184,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(publicProduct.precoCentavos, 129990)
       assert.equal(publicProduct.ficha, undefined)
       assert.equal(publicProduct.origem, undefined)
+      assert.equal(publicProduct.cores[0].imagem, '/produtos/teste/verde.png')
       const history = (await app.inject({ url: '/api/admin/historico', headers: headers(dennis) })).json().eventos
       assert.ok(history.some(e => e.actor_name === 'Talissa' && e.product_id === product.id))
       assert.equal(JSON.stringify(history).includes('password_hash'), false)
@@ -205,6 +208,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(imported.statusCode, 400)
       assert.deepEqual(await readCatalog(pool), before)
       assert.equal((await save(dennis, { ...fixture(), imagens: ['javascript:alert(1)'] }, before.revision)).statusCode, 400)
+      const invalidImage = fixture()
+      invalidImage.cores[0].imagem = 'javascript:alert(1)'
+      assert.equal((await save(dennis, invalidImage, before.revision)).statusCode, 400)
       assert.equal((await save(dennis, { ...fixture(), cores: null }, before.revision)).statusCode, 400)
       const existing = (await pool.query('SELECT * FROM variants LIMIT 1')).rows[0]
       await assert.rejects(pool.query('INSERT INTO variants(product_id,id,sku_key,stock_site) VALUES($1,$2,$3,$4)', [existing.product_id, randomUUID(), existing.sku_key, 0]), { code: '23505' })

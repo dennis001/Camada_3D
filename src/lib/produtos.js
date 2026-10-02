@@ -134,6 +134,7 @@ export function validarProduto(produto, todos = []) {
         conjunto.add(chave)
       }
       if (!centavosValidos(cor.estoqueSite)) erros.push(`${rotulo}: estoque deve ser um inteiro maior ou igual a zero.`)
+      if (cor.imagem !== undefined && (typeof cor.imagem !== 'string' || (cor.imagem && !urlHttp(cor.imagem) && !(cor.imagem.startsWith('/') && !cor.imagem.startsWith('//') && !cor.imagem.includes('\\'))))) erros.push(`${rotulo}: imagem deve ser uma URL HTTP(S) ou caminho local válido.`)
     })
   }
 
@@ -268,6 +269,6 @@ export function toProdutoPublico(produto) {
     material: produto.material,
     medidas: produto.medidas,
     imagens: [...produto.imagens],
-    cores: produto.cores.map(({ id, sku, nome, estoqueSite }) => ({ id, sku, nome, estoqueSite })),
+    cores: produto.cores.map(({ id, sku, nome, estoqueSite, imagem }) => ({ id, sku, nome, estoqueSite, ...(imagem ? { imagem } : {}) })),
   }
 }

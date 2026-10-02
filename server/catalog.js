@@ -24,7 +24,7 @@ export function validateProducts(products) {
 export function canonicalProduct(p) {
   const keys = ['id', 'nome', 'descricao', 'categoriaId', 'precoCentavos', 'material', 'medidas', 'imagens', 'publicado']
   const result = Object.fromEntries(keys.map(key => [key, p[key]]))
-  result.cores = p.cores.map(({ id, sku, nome, estoqueSite }) => ({ id, sku, nome, estoqueSite }))
+  result.cores = p.cores.map(({ id, sku, nome, estoqueSite, imagem }) => ({ id, sku, nome, estoqueSite, ...(imagem ? { imagem } : {}) }))
   result.ficha = Object.fromEntries(['tempoPlacaMinutos', 'unidadesPorPlaca', 'potenciaWatts', 'tarifaKwhCentavos', 'embalagemCentavos', 'outrosCustosCentavos', 'perfil', 'arquivo3mf'].map(key => [key, p.ficha[key]]))
   result.ficha.filamentos = p.ficha.filamentos.map(({ material, cor, gramasPorPlaca, precoKgCentavos }) => ({ material, cor, gramasPorPlaca, precoKgCentavos }))
   result.origem = Object.fromEntries(['plataforma', 'url', 'autor', 'licenca', 'usoComercial', 'evidencia'].map(key => [key, p.origem[key]]))

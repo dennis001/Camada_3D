@@ -311,7 +311,7 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                     <option value="publicado">Publicado no catálogo</option>
                   </Campo>
                   <Campo rotulo="Material do produto" placeholder="Ex.: PLA" value={formulario.material} onChange={evento => campo('material', evento.target.value)} />
-                  <Campo rotulo="Medidas" placeholder="Ex.: 10 × 8 × 12 cm" value={formulario.medidas} onChange={evento => campo('medidas', evento.target.value)} />
+                  <Campo rotulo="Medidas (L × A × C)" placeholder="Ex.: L: 10 × A: 8 × C: 12 cm" value={formulario.medidas} onChange={evento => campo('medidas', evento.target.value)} dica="L = largura; A = altura; C = comprimento/profundidade. Informe também a unidade (cm ou mm)." />
                   <div className="sm:col-span-2"><Campo rotulo="Descrição" multiline rows={3} value={formulario.descricao} onChange={evento => campo('descricao', evento.target.value)} /></div>
                   <div className="sm:col-span-2"><Campo rotulo="Imagens" multiline rows={3} value={formulario.imagensTexto} onChange={evento => campo('imagensTexto', evento.target.value)} dica="Uma URL de imagem por linha. A primeira será a capa do produto." /></div>
                 </div>
@@ -326,6 +326,7 @@ export default function Gestao({ produtos, onSalvar, onExportar, onImportar, err
                         <Campo rotulo={`Nome da cor ${indice + 1}`} value={item.nome} onChange={evento => cor(indice, 'nome', evento.target.value)} placeholder="Ex.: Branco" />
                         <Campo rotulo={`SKU da cor ${indice + 1}`} value={item.sku} onChange={evento => cor(indice, 'sku', evento.target.value)} placeholder="Ex.: NATAL-01-BR" />
                         <Campo rotulo={`Estoque da cor ${indice + 1}`} inputMode="numeric" value={item.estoqueSite} onChange={evento => cor(indice, 'estoqueSite', evento.target.value)} dica="Quantidade inteira de unidades." />
+                        <div className="sm:col-span-3"><Campo rotulo={`Imagem da cor ${indice + 1} (opcional)`} value={item.imagem || ''} onChange={evento => cor(indice, 'imagem', evento.target.value)} dica="URL ou caminho da imagem que será exibida ao escolher esta cor. Ela também aparece ao final da galeria." /></div>
                       </div>
                     </div>
                   ))}

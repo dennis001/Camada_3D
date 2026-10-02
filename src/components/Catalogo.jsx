@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react'
-import { Box, Search, ShoppingBag } from 'lucide-react'
+import { Box, Search, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
 import { categorias, formatarMoeda, normalizarTexto } from '../lib/produtos.js'
 
 function ImagemProduto({ src, nome }) {
@@ -26,9 +26,20 @@ function ProdutoCard({ produto, onAdicionar }) {
   const cor = cores.find((item) => item.id === corId) || cores.find((item) => item.estoqueSite > 0) || cores[0]
   const estoque = cor?.estoqueSite || 0
   const categoria = categorias.find((item) => item.id === produto.categoriaId)
-  const imagens = produto.imagens || []
+  const imagens = [...new Set([...(produto.imagens || []), ...cores.map(item => item.imagem).filter(Boolean)])]
   const imagem = imagens[indiceFoto] || imagens[0]
   const quantidadeValida = Number.isInteger(Number(quantidade)) && Number(quantidade) >= 1 && Number(quantidade) <= estoque
+
+  function selecionarCor(item) {
+    setCorId(item.id); setQuantidade('1'); setMensagem(null)
+    if (item.imagem) setIndiceFoto(imagens.indexOf(item.imagem))
+  }
+  function trocarFoto(direcao) {
+    const indice = ((Math.max(0, imagens.indexOf(imagem)) + direcao) % imagens.length + imagens.length) % imagens.length
+    setIndiceFoto(indice)
+    const variante = cores.find(item => item.imagem === imagens[indice])
+    if (variante) { setCorId(variante.id); setQuantidade('1'); setMensagem(null) }
+  }
 
   function adicionar(event) {
     event.preventDefault()
@@ -44,17 +55,23 @@ function ProdutoCard({ produto, onAdicionar }) {
 
   return (
     <article className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-      <div className="h-56 bg-gray-50">
+      <div className="relative h-56 bg-gray-50" role="group" aria-label={'Fotos de ' + produto.nome}>
         <ImagemProduto key={imagem || 'sem-foto'} src={imagem} nome={produto.nome} />
+        {imagens.length > 1 && <>
+          <button type="button" onClick={() => trocarFoto(-1)} aria-label={'Foto anterior de ' + produto.nome} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border bg-white/95 p-2 text-gray-700 shadow hover:bg-white focus-visible:outline-camada-teal-600"><ChevronLeft size={22} aria-hidden="true" /></button>
+          <button type="button" onClick={() => trocarFoto(1)} aria-label={'Próxima foto de ' + produto.nome} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border bg-white/95 p-2 text-gray-700 shadow hover:bg-white focus-visible:outline-camada-teal-600"><ChevronRight size={22} aria-hidden="true" /></button>
+          <span role="status" className="absolute bottom-2 right-3 rounded-full bg-black/60 px-2 py-1 text-xs text-white">{Math.max(0, imagens.indexOf(imagem)) + 1} / {imagens.length}</span>
+        </>}
       </div>
-      {imagens.length > 1 && (
-        <div className="flex flex-wrap justify-center gap-2 px-4 py-3" aria-label={'Fotos de ' + produto.nome}>
-          {imagens.map((src, indice) => (
-            <button key={src + '-' + indice} type="button" aria-label={'Ver foto ' + (indice + 1) + ' de ' + produto.nome} aria-pressed={imagem === src}
-              onClick={() => setIndiceFoto(indice)} className={'text-xs px-3 py-2 rounded-lg border ' + (imagem === src ? 'border-camada-teal-600 text-camada-teal-700 bg-camada-teal-50' : 'border-gray-300 text-gray-600')}>
-              Foto {indice + 1}
+      {imagem && cores.some(item => item.imagem === imagem) && <p className="px-4 pt-2 text-xs text-gray-500">Imagem ilustrativa da cor. O tom pode variar na peça impressa.</p>}
+      {cores.length > 0 && (
+        <div className="border-b border-gray-100 px-4 py-3" role="group" aria-label={'Cores de ' + produto.nome}>
+          <p className="mb-2 text-sm font-medium text-gray-700">Cor: {cor?.nome}</p>
+          <div className="flex flex-wrap gap-2">{cores.map(item => (
+            <button key={item.id} type="button" aria-pressed={cor?.id === item.id} onClick={() => selecionarCor(item)} className={'rounded-lg border px-3 py-2 text-xs ' + (cor?.id === item.id ? 'border-camada-teal-600 bg-camada-teal-50 text-camada-teal-700' : 'border-gray-300 text-gray-600')}>
+              {item.nome}{item.estoqueSite > 0 ? '' : ' — indisponível'}
             </button>
-          ))}
+          ))}</div>
         </div>
       )}
       <div className="p-6 flex flex-col flex-1">
@@ -68,20 +85,13 @@ function ProdutoCard({ produto, onAdicionar }) {
             <p className="whitespace-pre-line">{produto.descricao}</p>
             <p><strong className="font-medium">Material:</strong> {produto.material || 'A informar'}</p>
             <p><strong className="font-medium">Medidas:</strong> {produto.medidas || 'A informar'}</p>
+            <p className="text-xs">L = largura · A = altura · C = comprimento/profundidade.</p>
             {cor?.sku && <p className="break-words"><strong className="font-medium">SKU da cor selecionada:</strong> {cor.sku}</p>}
           </div>
         </details>
         <p className="text-2xl font-bold text-camada-teal-700 mb-4">{formatarMoeda(produto.precoCentavos)}</p>
         <form onSubmit={adicionar} className="mt-auto space-y-4">
-          <div>
-            <label htmlFor={'cor-' + produto.id} className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
-            <select id={'cor-' + produto.id} value={cor?.id || ''} disabled={!cores.length}
-              onChange={(event) => { setCorId(event.target.value); setQuantidade('1'); setMensagem(null) }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white">
-              {!cores.length && <option value="">Nenhuma cor cadastrada</option>}
-              {cores.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.estoqueSite > 0 ? ' — ' + item.estoqueSite + ' disponível(is)' : ' — esgotada'}</option>)}
-            </select>
-          </div>
+          {!cores.length && <p className="text-sm text-gray-600">Nenhuma cor cadastrada.</p>}
           <div className="flex gap-4 items-end">
             <div className="w-24 shrink-0">
               <label htmlFor={'quantidade-' + produto.id} className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
