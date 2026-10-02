@@ -39,7 +39,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
   const database = await localPostgres({ directory, port, password: dbPassword })
   let pool, restored, app
   const credentials = { dennis: token(), talissa: token() }
-  const newPassword = token()
+  const newPassword = 'Abcdef!g'
   let dennis, talissa, product
   function headers(session) { return { origin, cookie: session.cookie, 'x-csrf-token': session.csrfToken } }
   async function login(username, password, instance = app, loginOrigin = origin) {
@@ -72,6 +72,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.ok(initial.response.headers['set-cookie'].includes('SameSite=Strict'))
       assert.equal((await app.inject({ url: '/api/admin/produtos', headers: headers(initial) })).statusCode, 403)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/password', headers: { origin, cookie: initial.cookie }, payload: { currentPassword: credentials.dennis, newPassword } })).statusCode, 403)
+      const weak = await app.inject({ method: 'POST', url: '/api/auth/password', headers: headers(initial), payload: { currentPassword: credentials.dennis, newPassword: 'abcdefgh' } })
+      assert.equal(weak.statusCode, 400)
+      assert.match(weak.json().error, /maiúscula/)
       const changed = await app.inject({ method: 'POST', url: '/api/auth/password', headers: headers(initial), payload: { currentPassword: credentials.dennis, newPassword } })
       assert.equal(changed.statusCode, 200, changed.body)
       assert.equal((await app.inject({ url: '/api/auth/me', headers: headers(initial) })).statusCode, 401)
@@ -101,7 +104,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       } finally { await pool.query("UPDATE admins SET role='admin' WHERE username='dennis'") }
     })
     await t.test('cadastro público cria cliente persistente sem acesso administrativo', async () => {
-      const payload = { name: 'Cliente Teste', email: ' CLIENTE@example.test ', password: token() }
+      const payload = { name: 'Cliente Teste', email: ' CLIENTE@example.test ', password: 'Abcdef!g' }
       const register = body => app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload: body })
       assert.equal((await register({ ...payload, role: 'admin' })).statusCode, 400)
       assert.equal((await register({ ...payload, email: 'dennis' })).statusCode, 400)
@@ -115,6 +118,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       for (const url of ['/api/admin/produtos', '/api/admin/historico']) assert.equal((await app.inject({ url, headers: headers(customer) })).statusCode, 403)
       assert.equal((await save(customer, fixture(), 0)).statusCode, 403)
       assert.equal((await register({ ...payload, email: 'cliente@example.test' })).statusCode, 409)
+      const weak = await register({ ...payload, email: 'outra@example.test', password: 'ABCDEFG!' })
+      assert.equal(weak.statusCode, 400)
+      assert.match(weak.json().error, /minúscula/)
       const stored = (await pool.query("SELECT * FROM admins WHERE username='cliente@example.test'")).rows[0]
       assert.notEqual(stored.password_hash, payload.password)
       assert.equal((await pool.query("SELECT count(*)::int AS count FROM admins WHERE username='cliente@example.test'")).rows[0].count, 1)

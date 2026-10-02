@@ -1,3 +1,4 @@
+import { REGRAS_SENHA, validarFormularioAcesso } from '../lib/senha'
 import React, { useState } from 'react'
 import { api } from '../lib/api'
 import { podeAdministrar } from '../lib/acesso'
@@ -15,6 +16,7 @@ export default function Login({ session, onSession }) {
     const fields = new FormData(event.currentTarget)
     setBusy(true); setError('')
     try {
+      validarFormularioAcesso(event.currentTarget)
       if (session?.user.mustChangePassword) {
         if (fields.get('newPassword') !== fields.get('confirmation')) throw new Error('A confirmação da senha não confere.')
         await api('/auth/password', { method: 'POST', csrfToken: session.csrfToken, body: { currentPassword: fields.get('password'), newPassword: fields.get('newPassword') } })
@@ -47,18 +49,18 @@ export default function Login({ session, onSession }) {
         <h1 className="text-2xl font-bold">{session?.user.mustChangePassword ? 'Defina sua senha pessoal' : session ? 'Sua conta' : register ? 'Criar conta' : 'Entrar'}</h1>
         {error && <p role="alert" className="my-4 text-red-700">{error}</p>}
         {notice && <p role="status" className="my-4 text-camada-teal-700">{notice}</p>}
-        {(!session || session.user.mustChangePassword) && <form key={session ? 'password' : register ? 'register' : 'login'} onSubmit={submit} className="mt-6 space-y-4">
+        {(!session || session.user.mustChangePassword) && <form noValidate key={session ? 'password' : register ? 'register' : 'login'} onSubmit={submit} className="mt-6 space-y-4">
           {!session && (register ? <>
             <label className="block">Nome<input name="name" autoComplete="name" required minLength={2} maxLength={120} className={field} /></label>
             <label className="block">E-mail<input name="email" type="email" autoComplete="email" required maxLength={254} className={field} /></label>
-            <p className="text-sm text-gray-600">Escolha uma senha com 12 a 128 caracteres.</p>
+            <p className="text-sm text-gray-600">{REGRAS_SENHA}</p>
           </> : <label className="block">E-mail ou usuário<input name="username" defaultValue={email} autoComplete="username" required maxLength={254} className={field} /></label>)}
-          <label className="block">{session ? 'Senha temporária' : 'Senha'}<input name="password" type="password" autoComplete={!session && register ? 'new-password' : 'current-password'} required minLength={!session && register ? 12 : undefined} maxLength={128} className={field} /></label>
-          {!session && register && <label className="block">Confirmar senha<input name="confirmation" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className={field} /></label>}
+          <label className="block">{session ? 'Senha temporária' : 'Senha'}<input name="password" type="password" autoComplete={!session && register ? 'new-password' : 'current-password'} required minLength={!session && register ? 8 : undefined} maxLength={128} className={field} /></label>
+          {!session && register && <label className="block">Confirmar senha<input name="confirmation" type="password" autoComplete="new-password" required minLength={8} maxLength={128} className={field} /></label>}
           {session && <>
-            <p className="text-sm text-gray-600">Escolha uma senha com 12 a 128 caracteres.</p>
-            <label className="block">Nova senha<input name="newPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className={field} /></label>
-            <label className="block">Confirmar nova senha<input name="confirmation" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className={field} /></label>
+            <p className="text-sm text-gray-600">{REGRAS_SENHA}</p>
+            <label className="block">Nova senha<input name="newPassword" type="password" autoComplete="new-password" required minLength={8} maxLength={128} className={field} /></label>
+            <label className="block">Confirmar nova senha<input name="confirmation" type="password" autoComplete="new-password" required minLength={8} maxLength={128} className={field} /></label>
           </>}
           <button disabled={busy} className="btn-primary w-full disabled:opacity-50">{busy ? 'Aguarde…' : session ? 'Salvar senha' : register ? 'Criar conta' : 'Entrar'}</button>
           <p className="text-sm text-gray-500">Para recuperar o acesso, entre em contato com o responsável pelo sistema.</p>

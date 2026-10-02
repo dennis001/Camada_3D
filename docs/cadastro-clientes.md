@@ -9,7 +9,7 @@ O endpoint `POST /api/auth/register` aceita somente `name`, `email` e `password`
 ## Roteiro exploratório
 
 - [ ] Abrir `/login` sem sessão e alternar entre entrar e criar conta.
-- [ ] Conferir nome/e-mail obrigatórios, senha de 12 a 128 caracteres e confirmação igual.
+- [ ] Conferir nome/e-mail obrigatórios, senha de 8 a 128 caracteres com maiúscula, minúscula e caractere especial e confirmação igual.
 - [ ] Cadastrar e entrar; conferir retorno à loja e ausência de Administração no menu.
 - [ ] Abrir `/admin` como cliente e conferir acesso restrito. A API também deve negar acesso.
 - [ ] Sair, entrar novamente e tentar cadastrar o mesmo e-mail com outras letras maiúsculas.

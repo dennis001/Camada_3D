@@ -6,6 +6,7 @@ import { transaction } from './db.js'
 import { audit, fail, publicCatalog, readCatalog, saveCatalog } from './catalog.js'
 import { podeAdministrar } from '../src/lib/acesso.js'
 import { randomUUID } from 'node:crypto'
+import { REGRAS_SENHA } from '../src/lib/senha.js'
 
 const userView = row => ({ id: row.id, username: row.username, name: row.name, role: row.role, mustChangePassword: row.must_change_password })
 const credentials = {
@@ -60,15 +61,16 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
       properties: {
         name: { type: 'string', minLength: 2, maxLength: 120 },
         email: { type: 'string', minLength: 3, maxLength: 254 },
-        password: { type: 'string', minLength: 12, maxLength: 128 },
+        password: { type: 'string', maxLength: 128 },
       },
     } },
   }, async (request, reply) => {
     const name = request.body.name.trim()
     const email = request.body.email.trim().toLowerCase()
-    if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validPassword(request.body.password)) {
-      throw fail(400, 'Informe nome, e-mail válido e senha com 12 a 128 caracteres.')
+    if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw fail(400, 'Informe nome e e-mail válido.')
     }
+    if (!validPassword(request.body.password)) throw fail(400, REGRAS_SENHA)
     const passwordHash = await hashPassword(request.body.password)
     await transaction(pool, async client => {
       // A tabela de identidades mantém seu nome original. O perfil nunca vem do cliente.
@@ -109,10 +111,11 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
   app.post('/api/auth/password', {
     onRequest: authenticated,
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-    schema: { body: { type: 'object', additionalProperties: false, required: ['currentPassword', 'newPassword'], properties: { currentPassword: { type: 'string', maxLength: 128 }, newPassword: { type: 'string', minLength: 12, maxLength: 128 } } } },
+    schema: { body: { type: 'object', additionalProperties: false, required: ['currentPassword', 'newPassword'], properties: { currentPassword: { type: 'string', maxLength: 128 }, newPassword: { type: 'string', maxLength: 128 } } } },
   }, async (request, reply) => {
     const { currentPassword, newPassword } = request.body
-    if (!validPassword(newPassword) || currentPassword === newPassword) throw fail(400, 'Escolha uma senha nova com 12 a 128 caracteres.')
+    if (!validPassword(newPassword)) throw fail(400, REGRAS_SENHA)
+    if (currentPassword === newPassword) throw fail(400, 'Escolha uma senha diferente da atual.')
     await transaction(pool, async client => {
       const result = await client.query('SELECT password_hash FROM admins WHERE id=$1 FOR UPDATE', [request.admin.id])
       if (!await verifyPassword(currentPassword, result.rows[0].password_hash)) throw fail(400, 'Senha atual incorreta.')
