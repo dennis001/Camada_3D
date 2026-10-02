@@ -1,6 +1,5 @@
 ﻿import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Box, Search, ShoppingBag, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { estimarImpressao, formatarTempoImpressao } from '../lib/producao.js'
 import { categorias, formatarMoeda, normalizarTexto } from '../lib/produtos.js'
 
 function ImagemProduto({ src, nome }) {
@@ -93,7 +92,6 @@ function ProdutoCard({ produto, onAdicionar, onVerDetalhes, ampliado = false, on
           </div>
         </details>
         <p className="text-2xl font-bold text-camada-teal-700 mb-4">{formatarMoeda(produto.precoCentavos)}</p>
-        <p className="mb-4 text-sm text-gray-600">Impressão para esta quantidade: {formatarTempoImpressao(estimarImpressao(Number(quantidade), produto.producao).minutos)}. O transporte é calculado separadamente.</p>
         <form onSubmit={adicionar} className="mt-auto space-y-4">
           {!cores.length && <p className="text-sm text-gray-600">Nenhuma cor cadastrada.</p>}
           <div className="flex gap-4 items-end">
@@ -110,7 +108,7 @@ function ProdutoCard({ produto, onAdicionar, onVerDetalhes, ampliado = false, on
             {cor ? 'Adicionar ao carrinho' : 'Indisponível'}
           </button>
           <div className="text-sm min-h-[1.25rem]" role="status" aria-live="polite">
-            {mensagem && <p className={mensagem.ok ? 'text-camada-teal-700' : 'text-red-700'}>{mensagem.texto} {mensagem.ok && <a href="#carrinho" onClick={onVerCarrinho} className="underline font-medium">Ver carrinho</a>}</p>}
+            {mensagem && <p className={mensagem.ok ? 'text-camada-teal-700' : 'text-red-700'}>{mensagem.texto} {mensagem.ok && <a href="/carrinho" onClick={onVerCarrinho} className="underline font-medium">Ver carrinho</a>}</p>}
           </div>
         </form>
       </div>

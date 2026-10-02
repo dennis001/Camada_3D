@@ -36,6 +36,13 @@ test('vitrine e navegação escondem administração para visitantes e contas co
     const home = renderToStaticMarkup(React.createElement(App))
     assert.equal(home.includes('id="gestao"'), false)
     assert.equal(home.includes('Administração'), false)
+    assert.equal(home.includes('id="carrinho"'), false)
+    assert.ok(home.includes('href="/carrinho"'))
+    globalThis.window.location.pathname = '/carrinho'
+    const cartPage = renderToStaticMarkup(React.createElement(App))
+    assert.ok(cartPage.includes('Seu carrinho'))
+    assert.equal(cartPage.includes('id="catalogo"'), false)
+    assert.equal(cartPage.includes('Impressão estimada'), false)
     globalThis.window.location.pathname = '/admin'
     const protectedPage = renderToStaticMarkup(React.createElement(App))
     assert.equal(protectedPage.includes('Gestão de produtos'), false)

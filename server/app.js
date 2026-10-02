@@ -1,3 +1,4 @@
+import { registerCheckout } from './checkout.js'
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
@@ -145,5 +146,6 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
     const result = await pool.query('SELECT e.id,e.action,e.product_id,e.created_at,a.name AS actor_name FROM audit_events e LEFT JOIN admins a ON a.id=e.actor_id ORDER BY e.created_at DESC,e.id LIMIT 100')
     return { eventos: result.rows }
   })
+  registerCheckout(app, { pool, authenticated, catalogPreviewIds, enabled: !production && environment === 'development' && ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname) })
   return app
 }

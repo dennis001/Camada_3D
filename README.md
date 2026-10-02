@@ -18,6 +18,7 @@ Somente para testes neste computador, abra http://127.0.0.1:3000/login. Esse end
 
 - [Como usar, recuperar acesso e fazer backup](docs/backend.md)
 - [Domínio e ambientes de desenvolvimento e produção](docs/ambientes.md)
+- [Carrinho e compra de teste até confirmação simulada](docs/checkout-teste.md)
 - [Produção sob encomenda e estimativa por lotes](docs/producao-encomenda.md)
 - [Cadastro de clientes e roteiro de testes exploratórios](docs/cadastro-clientes.md)
 - [Planejamento por história e dependências do servidor](docs/plano-sem-servidor.md)

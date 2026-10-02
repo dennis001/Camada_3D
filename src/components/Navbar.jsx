@@ -7,10 +7,10 @@ export default function Navbar({ quantidadeCarrinho = 0, user = null }) {
   const [aberto, setAberto] = useState(false)
   const botaoMenu = useRef(null)
   const links = [
-    { nome: 'Início', href: '#inicio' },
-    { nome: 'Catálogo', href: '#catalogo' },
-    { nome: 'Sobre', href: '#sobre' },
-    { nome: 'Contato', href: '#contato' },
+    { nome: 'Início', href: '/#inicio' },
+    { nome: 'Catálogo', href: '/#catalogo' },
+    { nome: 'Sobre', href: '/#sobre' },
+    { nome: 'Contato', href: '/#contato' },
     ...(podeAdministrar(user) ? [{ nome: 'Administração', href: '/admin' }] : []),
     { nome: user ? 'Minha conta' : 'Entrar/Cadastrar', href: '/login' },
   ]
@@ -18,6 +18,7 @@ export default function Navbar({ quantidadeCarrinho = 0, user = null }) {
   function buscar(event) {
     event.preventDefault()
     setAberto(false)
+    if (window.location.pathname !== '/') { window.location.assign('/#busca-produtos'); return }
     window.location.hash = 'busca-produtos'
     document.getElementById('busca-produtos')?.focus({ preventScroll: true })
   }
@@ -33,13 +34,13 @@ export default function Navbar({ quantidadeCarrinho = 0, user = null }) {
     <nav aria-label="Navegação principal" onKeyDown={fecharComEscape} className="fixed inset-x-0 top-0 bg-white/95 backdrop-blur-md shadow-sm z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20 gap-3">
-          <a href="#inicio" onClick={() => setAberto(false)} aria-label="Studio Camadas — Início"><Logo size="md" showText variant="dark" /></a>
+          <a href="/#inicio" onClick={() => setAberto(false)} aria-label="Studio Camadas — Início"><Logo size="md" showText variant="dark" /></a>
           <div className="hidden lg:flex items-center gap-2">
             {links.map((link) => <a key={link.href} href={link.href} className="text-gray-600 hover:text-camada-teal-700 px-3 py-2 rounded-md text-sm font-medium">{link.nome}</a>)}
           </div>
           <div className="flex items-center gap-3">
-            <a href="#busca-produtos" onClick={buscar} aria-label="Buscar produtos" className="p-2 text-gray-600 hover:text-camada-teal-700"><Search size={21} aria-hidden="true" /></a>
-            <a href="#carrinho" onClick={() => setAberto(false)} aria-label={'Carrinho: ' + quantidadeCarrinho + ' item(ns)'} className="p-2 text-gray-600 hover:text-camada-teal-700 relative mr-2">
+            <a href="/#busca-produtos" onClick={buscar} aria-label="Buscar produtos" className="p-2 text-gray-600 hover:text-camada-teal-700"><Search size={21} aria-hidden="true" /></a>
+            <a href="/carrinho" onClick={() => setAberto(false)} aria-label={'Carrinho: ' + quantidadeCarrinho + ' item(ns)'} className="p-2 text-gray-600 hover:text-camada-teal-700 relative mr-2">
               <ShoppingBag size={21} aria-hidden="true" />
               <span aria-hidden="true" className="absolute -top-1 -right-2 min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-camada-teal-600 text-white text-xs font-semibold">{quantidadeCarrinho}</span>
             </a>
@@ -52,7 +53,7 @@ export default function Navbar({ quantidadeCarrinho = 0, user = null }) {
       <div id="menu-mobile" hidden={!aberto} className="lg:hidden bg-white border-t">
         <div className="px-4 pt-2 pb-5 space-y-1">
           {links.map((link) => <a key={link.href} href={link.href} onClick={() => setAberto(false)} className="block px-3 py-3 font-medium text-gray-700 hover:bg-gray-50 rounded-md">{link.nome}</a>)}
-          <a href="#carrinho" onClick={() => setAberto(false)} className="block px-3 py-3 font-medium text-camada-teal-700">Carrinho ({quantidadeCarrinho})</a>
+          <a href="/carrinho" onClick={() => setAberto(false)} className="block px-3 py-3 font-medium text-camada-teal-700">Carrinho ({quantidadeCarrinho})</a>
         </div>
       </div>
     </nav>

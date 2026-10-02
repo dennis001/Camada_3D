@@ -60,7 +60,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     app = await buildApp({ pool, origin, loginMax: 100 })
 
     await t.test('migrações são repetíveis, área privada e origem externa são bloqueadas', async () => {
-      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 2)
+      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 3)
       for (const url of ['/api/admin/produtos', '/api/admin/historico', '/api/auth/me']) assert.equal((await app.inject(url)).statusCode, 401)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/login', headers: { origin: 'https://intruso.invalid' }, payload: { username: 'dennis', password: credentials.dennis } })).statusCode, 403)
       assert.equal((await app.inject({ method: 'PUT', url: '/api/admin/produtos/p', headers: { origin }, payload: { produto: fixture(), revision: 0 } })).statusCode, 401)
@@ -190,6 +190,39 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(JSON.stringify(history).includes('password_hash'), false)
       assert.equal((await pool.query('SELECT * FROM product_revisions WHERE product_id=$1', [product.id])).rowCount, 2)
     })
+
+    await t.test('checkout de teste valida preço, identidade, CSRF e confirmação idempotente', async () => {
+      const customer = await login('cliente@example.test', 'Abcdef!g');
+      const catalog = (await app.inject('/api/catalogo')).json().produtos;
+      const item = catalog[0];
+      const payload = { requestId: randomUUID(), itens: [{ produtoId: item.id, corId: item.cores[0].id, quantidade: 5 }], endereco: { nome: 'Cliente Teste', cep: '01001000', rua: 'Rua fictícia', numero: '1', bairro: 'Centro', cidade: 'São Paulo', uf: 'SP' }, pagamento: 'pix' };
+      assert.equal((await app.inject('/api/checkout/config')).json().teste, true);
+      const url = '/api/checkout/teste';
+      assert.equal((await app.inject({method:'POST',url,headers:{origin},payload})).statusCode,401);
+      assert.equal((await app.inject({method:'POST',url,headers:{origin,cookie:customer.cookie},payload})).statusCode,403);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,total:1}})).statusCode,400);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,endereco:{...payload.endereco,cep:'123'}}})).statusCode,400);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,itens:[{...payload.itens[0],corId:'inexistente'}]}})).statusCode,409);
+      const created = await app.inject({method:'POST',url,headers:headers(customer),payload});
+      assert.equal(created.statusCode,200,created.body);
+      const order = created.json().pedido;
+      assert.equal(order.details.total,item.precoCentavos*5);
+      assert.equal(order.status,'pending');
+      const retry = await app.inject({method:'POST',url,headers:headers(customer),payload});
+      assert.equal(retry.json().pedido.id,order.id);
+      const detailUrl = url+'/'+order.id;
+      assert.equal((await app.inject({url:detailUrl,headers:headers(talissa)})).statusCode,404);
+      assert.equal((await app.inject({method:'POST',url:detailUrl+'/confirmar',headers:headers(talissa)})).statusCode,404);
+      for(let n=0;n<2;n++) assert.equal((await app.inject({method:'POST',url:detailUrl+'/confirmar',headers:headers(customer)})).json().pedido.status,'confirmed');
+      assert.equal((await app.inject({url:detailUrl,headers:headers(customer)})).json().pedido.status,'confirmed');
+      const remote = await buildApp({pool,origin:'https://loja.example',production:true});
+      try {
+        assert.equal((await remote.inject('/api/checkout/config')).json().teste,false);
+        assert.equal((await remote.inject({method:'POST',url,headers:{origin:'https://loja.example'},payload})).statusCode,404);
+      } finally {await remote.close()}
+      const credit = await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,requestId:randomUUID(),pagamento:'credito'}});
+      assert.equal(credit.json().pedido.details.pagamento,'credito');
+    });
     await t.test('edições simultâneas não sobrescrevem a versão vencedora', async () => {
       const revision = (await readCatalog(pool)).revision
       const responses = await Promise.all([save(dennis, { ...product, nome: 'Edição Dennis' }, revision), save(talissa, { ...product, nome: 'Edição Talissa' }, revision)])
@@ -265,6 +298,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       await migrate(restored)
       await restoreDatabase(restored, JSON.parse(JSON.stringify(snapshot)))
       assert.deepEqual(await readCatalog(restored), await readCatalog(pool))
+      assert.deepEqual((await restored.query('SELECT * FROM test_orders ORDER BY id')).rows, (await pool.query('SELECT * FROM test_orders ORDER BY id')).rows)
       assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 3)
       assert.equal((await restored.query("SELECT role FROM admins WHERE username='cliente@example.test'")).rows[0].role, 'customer')
       assert.equal((await restored.query('SELECT * FROM sessions')).rowCount, 0)

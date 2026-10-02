@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import Catalogo from './components/Catalogo'
 import Carrinho from './components/Carrinho'
+import Checkout from './components/Checkout'
 import Sobre from './components/Sobre'
 import Footer from './components/Footer'
 import { podeAdministrar } from './lib/acesso'
@@ -12,7 +13,7 @@ import { api } from './lib/api'
 import { alterarQuantidade, chaveItem, detalharCarrinho, validarCarrinho } from './lib/carrinho'
 import { CHAVE_CARRINHO } from './lib/persistencia'
 
-function Loja({ session }) {
+function Loja({ session, route }) {
   const [produtos, setProdutos] = useState([])
   const [erroCatalogo, setErroCatalogo] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -67,15 +68,16 @@ function Loja({ session }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar quantidadeCarrinho={carrinho.reduce((total, item) => total + item.quantidade, 0)} user={session?.user} />
-      <main>
-        <Hero />
-        <div className="border-y border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-900">Loja em preparação. Pedidos, reservas e pagamentos ainda não estão disponíveis.</div>
+      <main className={route === '/' ? '' : 'pt-24'}>
+        {route === '/' && <Hero />}
+        <div className="border-y border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-900">Loja em preparação. Compras neste ambiente são testes, sem cobrança.</div>
         {carregando && <p role="status" className="p-6 text-center">Carregando catálogo…</p>}
         {erroCatalogo && <div role="alert" className="p-6 text-center text-red-700">{erroCatalogo} <button onClick={() => { setCarregando(true); setCatalogVersion(v => v + 1) }} className="underline">Tentar novamente</button></div>}
-        <Catalogo produtos={produtos} onAdicionar={adicionar} />
+        {route === '/' && <Catalogo produtos={produtos} onAdicionar={adicionar} />}
         {erroCarrinho && <p role="alert" className="mx-auto max-w-7xl px-4 text-red-700">{erroCarrinho}</p>}
-        <Carrinho itens={itens} onQuantidade={mudarQuantidade} onRemover={chave => atualizarCarrinho(carrinhoRef.current.filter(item => chaveItem(item.produtoId, item.corId) !== chave))} />
-        <Sobre />
+        {route === '/carrinho' && <Carrinho bloqueado={carregando || Boolean(erroCatalogo)} itens={itens} onQuantidade={mudarQuantidade} onRemover={chave => atualizarCarrinho(carrinhoRef.current.filter(item => chaveItem(item.produtoId, item.corId) !== chave))} />}
+        {route === '/checkout' && <Checkout session={session} itens={itens} carregando={carregando || Boolean(erroCatalogo)} onLimpar={() => atualizarCarrinho([])} />}
+        {route === '/' && <Sobre />}
       </main>
       <Footer />
     </div>
@@ -110,7 +112,7 @@ export default function App() {
     const timer = setInterval(check, 60000)
     return () => { active = false; clearInterval(timer); window.removeEventListener('focus', check) }
   }, [attempt])
-  if (route === '/') return <Loja session={session} />
+  if (['/', '/carrinho', '/checkout'].includes(route)) return <Loja session={session} route={route} />
   if (!['/admin', '/login'].includes(route)) return <main className="p-8"><h1>Página não encontrada</h1><a href="/" className="underline">Voltar à loja</a></main>
   if (loading) return <p role="status" className="p-8">Verificando acesso…</p>
   if (error) return <main className="p-8"><p role="alert">{error}</p><button onClick={() => { setLoading(true); setAttempt(n => n + 1) }} className="btn-primary mt-4">Tentar novamente</button><a href="/" className="ml-4 underline">Voltar à loja</a></main>

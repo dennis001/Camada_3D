@@ -31,7 +31,7 @@ export default function Login({ session, onSession }) {
       } else {
         const result = await api('/auth/login', { method: 'POST', body: { username: fields.get('username'), password: fields.get('password') } })
         onSession(result)
-        if (!result.user.mustChangePassword) window.location.replace(podeAdministrar(result.user) ? '/admin' : '/')
+        if (!result.user.mustChangePassword) window.location.replace(new URLSearchParams(window.location.search).get('retorno') === '/checkout' ? '/checkout' : podeAdministrar(result.user) ? '/admin' : '/')
       }
     } catch (error) { setError(error.message) }
     finally { setBusy(false) }
