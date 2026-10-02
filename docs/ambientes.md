@@ -10,6 +10,12 @@ Preparação em 01/10/2026. Nenhum DNS foi alterado e nenhum ambiente foi public
 
 `www.studiocamadas.com.br` redireciona para o domínio principal. Cada site serve o frontend e `/api` na mesma origem. Login em `/login`, painel em `/admin`; o acesso direto ao painel também exige autenticação e perfil `admin` ou `developer`. Ambos os perfis administram os recursos disponíveis nesta etapa.
 
+O login oficial é `https://studiocamadas.com.br/login`; a validação publicada usa `https://dev.studiocamadas.com.br/login`. O endereço `127.0.0.1` atende apenas à prévia local. Os links da aplicação são relativos à origem, portanto cada ambiente permanece no próprio domínio. Alterar apenas um link não publica o site: é necessário executar a configuração de hospedagem abaixo.
+
+## Revisão de código
+
+Todo desenvolvimento e push devem ocorrer em branch própria. O usuário revisa e aprova o merge; não fazer push ou merge na `main`. Enviar código ao Git não equivale a publicar o site no domínio.
+
 ## O que falta para usar o domínio
 
 1. Identificar onde o DNS autoritativo é administrado e ter acesso ao painel. Preservar registros existentes de e-mail (MX/TXT) e outros serviços.
