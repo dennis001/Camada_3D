@@ -19,6 +19,8 @@ Construir uma marca de produtos impressos em 3D, começando por vendas na Shopee
 - Sem backend atualmente
 
 ## Princípios
+- Trabalhar em branch própria e enviar alterações somente para essa branch.
+- Nunca fazer push ou merge na `main`. O usuário revisa e aprova o merge.
 - Entregar em pequenas stories.
 - Evitar overengineering.
 - Não criar infraestrutura que não seja necessária para a venda inicial.
