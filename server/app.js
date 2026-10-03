@@ -1,3 +1,4 @@
+import { criarConsultaViaCep } from './cep.js'
 import { registerCheckout } from './checkout.js'
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
@@ -15,7 +16,7 @@ const credentials = {
   properties: { username: { type: 'string', minLength: 1, maxLength: 254 }, password: { type: 'string', minLength: 1, maxLength: 128 } },
 }
 
-export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10, catalogPreviewIds = [] }) {
+export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', production = false, environment = production ? 'production' : 'development', logger = false, loginMax = 10, catalogPreviewIds = [], consultarCep = criarConsultaViaCep() }) {
   if (!['development', 'production'].includes(environment)) throw new Error('APP_ENV deve ser development ou production.')
   if (new URL(origin).origin !== origin || (production && !origin.startsWith('https://'))) throw new Error('APP_ORIGIN deve ser uma origem exata; produção exige HTTPS.')
   if (catalogPreviewIds.length && (production || environment !== 'development' || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname))) throw new Error('Prévia de rascunhos é exclusiva do ambiente local de desenvolvimento.')
@@ -146,6 +147,10 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
     const result = await pool.query('SELECT e.id,e.action,e.product_id,e.created_at,a.name AS actor_name FROM audit_events e LEFT JOIN admins a ON a.id=e.actor_id ORDER BY e.created_at DESC,e.id LIMIT 100')
     return { eventos: result.rows }
   })
-  registerCheckout(app, { pool, authenticated, catalogPreviewIds, enabled: !production && environment === 'development' && ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname) })
+  app.get('/api/cep/:cep', {
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    schema: { params: { type: 'object', required: ['cep'], properties: { cep: { type: 'string', pattern: '^[0-9]{8}$' } } } },
+  }, async request => ({ endereco: await consultarCep(request.params.cep) }))
+  registerCheckout(app, { pool, authenticated, cookieName, cookieOptions, environment, catalogPreviewIds, enabled: !production && environment === 'development' && ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname) })
   return app
 }

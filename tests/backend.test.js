@@ -60,7 +60,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     app = await buildApp({ pool, origin, loginMax: 100 })
 
     await t.test('migrações são repetíveis, área privada e origem externa são bloqueadas', async () => {
-      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 3)
+      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 4)
       for (const url of ['/api/admin/produtos', '/api/admin/historico', '/api/auth/me']) assert.equal((await app.inject(url)).statusCode, 401)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/login', headers: { origin: 'https://intruso.invalid' }, payload: { username: 'dennis', password: credentials.dennis } })).statusCode, 403)
       assert.equal((await app.inject({ method: 'PUT', url: '/api/admin/produtos/p', headers: { origin }, payload: { produto: fixture(), revision: 0 } })).statusCode, 401)
@@ -223,6 +223,47 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       const credit = await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,requestId:randomUUID(),pagamento:'credito'}});
       assert.equal(credit.json().pedido.details.pagamento,'credito');
     });
+
+    await t.test('visitante compra sem conta, mantém pedido e não acessa pedidos de outro visitante', async () => {
+      const accountsBefore = (await pool.query('SELECT count(*) FROM admins')).rows[0].count;
+      const bootstrap = async () => {
+        const response = await app.inject({method:'POST',url:'/api/checkout/sessao',headers:{origin}});
+        assert.equal(response.statusCode,200,response.body);
+        assert.ok(response.headers['set-cookie'].includes('HttpOnly'));
+        assert.ok(response.headers['set-cookie'].includes('SameSite=Strict'));
+        return {csrfToken:response.json().csrfToken,cookie:response.cookies[0].name+'='+response.cookies[0].value};
+      };
+      const guest = await bootstrap(); const other = await bootstrap();
+      const item = (await app.inject('/api/catalogo')).json().produtos[0];
+      const payload = {requestId:randomUUID(),itens:[{produtoId:item.id,corId:item.cores[0].id,quantidade:2}],pagamento:'pix',endereco:{nome:'Visitante',cep:'01001000',rua:'Rua teste',numero:'S/N',bairro:'Centro',cidade:'São Paulo',uf:'SP',complemento:''}};
+      const url='/api/checkout/teste';
+      assert.equal((await app.inject({method:'POST',url,headers:{origin,cookie:guest.cookie},payload})).statusCode,403);
+      const created=await app.inject({method:'POST',url,headers:headers(guest),payload});
+      assert.equal(created.statusCode,200,created.body);
+      const id=created.json().pedido.id;
+      assert.equal(created.json().pedido.guest_id,undefined);
+      assert.equal((await pool.query('SELECT customer_id FROM test_orders WHERE id=$1',[id])).rows[0].customer_id,null);
+      assert.equal((await pool.query('SELECT count(*) FROM admins')).rows[0].count,accountsBefore);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(guest),payload})).json().pedido.id,id);
+      assert.equal((await app.inject({url:url+'/'+id,headers:headers(guest)})).statusCode,200);
+      assert.equal((await app.inject({url:url+'/'+id,headers:headers(other)})).statusCode,404);
+      assert.equal((await app.inject({method:'POST',url:url+'/'+id+'/confirmar',headers:headers(other)})).statusCode,404);
+      assert.equal((await app.inject({method:'POST',url:url+'/'+id+'/confirmar',headers:headers(guest)})).json().pedido.status,'confirmed');
+      assert.equal((await app.inject({url:'/api/admin/produtos',headers:headers(guest)})).statusCode,401);
+      await pool.query("UPDATE checkout_guests SET expires_at=now()-interval '1 second'");
+      assert.equal((await app.inject({url:url+'/'+id,headers:headers(guest)})).statusCode,401);
+    });
+    await t.test('consulta CEP pública valida formato e usa o adaptador sem exigir conta', async () => {
+      let calls=0;
+      const cepApp=await buildApp({pool,origin,consultarCep:async cep=>{calls++;return {cep,rua:'Praça da Sé',bairro:'Sé',cidade:'São Paulo',uf:'SP'}}});
+      try {
+        assert.equal((await cepApp.inject('/api/cep/123')).statusCode,400);
+        assert.equal(calls,0);
+        const response=await cepApp.inject('/api/cep/01001000');
+        assert.equal(response.statusCode,200);
+        assert.equal(response.json().endereco.cidade,'São Paulo');
+      } finally {await cepApp.close()}
+    });
     await t.test('edições simultâneas não sobrescrevem a versão vencedora', async () => {
       const revision = (await readCatalog(pool)).revision
       const responses = await Promise.all([save(dennis, { ...product, nome: 'Edição Dennis' }, revision), save(talissa, { ...product, nome: 'Edição Talissa' }, revision)])
@@ -293,6 +334,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     await t.test('backup restaura cadastros, contas e histórico em banco vazio sem sessões', async () => {
       const snapshot = await exportDatabase(pool)
       assert.equal(snapshot.sessions, undefined)
+      assert.equal(snapshot.checkout_guests, undefined)
       await pool.query('CREATE DATABASE restore_test')
       restored = createPool(connectionString.replace('/postgres', '/restore_test'))
       await migrate(restored)

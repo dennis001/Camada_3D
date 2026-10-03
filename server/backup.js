@@ -18,7 +18,7 @@ export async function restoreDatabase(pool, data) {
     admins: ['id', 'username', 'name', 'role', 'password_hash', 'must_change_password', 'active', 'created_at'],
     products: ['id', 'data', 'updated_by', 'updated_at'],
     product_revisions: ['product_id', 'revision', 'data', 'actor_id', 'created_at'],
-    test_orders: ['id', 'customer_id', 'request_id', 'details', 'status', 'created_at'],
+    test_orders: ['id', 'customer_id', 'guest_id', 'request_id', 'details', 'status', 'created_at'],
     audit_events: ['id', 'actor_id', 'action', 'product_id', 'created_at'],
   }
   for (const table of [...Object.keys(tables), 'schema_migrations', 'catalog_state']) if (!Array.isArray(data[table])) throw new Error('Backup incompleto.')
