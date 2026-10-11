@@ -60,7 +60,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     app = await buildApp({ pool, origin, loginMax: 100 })
 
     await t.test('migrações são repetíveis, área privada e origem externa são bloqueadas', async () => {
-      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 4)
+      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 5)
       for (const url of ['/api/admin/produtos', '/api/admin/historico', '/api/auth/me']) assert.equal((await app.inject(url)).statusCode, 401)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/login', headers: { origin: 'https://intruso.invalid' }, payload: { username: 'dennis', password: credentials.dennis } })).statusCode, 403)
       assert.equal((await app.inject({ method: 'PUT', url: '/api/admin/produtos/p', headers: { origin }, payload: { produto: fixture(), revision: 0 } })).statusCode, 401)
@@ -264,6 +264,58 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
         assert.equal(response.json().endereco.cidade,'São Paulo');
       } finally {await cepApp.close()}
     });
+
+    await t.test('painel de pedidos restringe acesso e preserva histórico e valores da compra', async () => {
+      const url='/api/admin/pedidos';
+      const customer=await login('cliente@example.test','Abcdef!g');
+      assert.equal((await app.inject(url)).statusCode,401);
+      assert.equal((await app.inject({url,headers:headers(customer)})).statusCode,403);
+      const response=await app.inject({url,headers:headers(dennis)});
+      assert.equal(response.statusCode,200,response.body);
+      const list=response.json();
+      assert.equal(list.resumo.quantidade,3);
+      assert.equal(list.resumo.confirmados,2);
+      assert.equal(list.resumo.pendentes,1);
+      assert.equal(list.resumo.total,list.pedidos.reduce((sum,p)=>sum+p.total,0));
+      assert.equal(response.body.includes('endereco'),false);
+      assert.equal(response.body.includes('customer_id'),false);
+      assert.equal(response.body.includes('guest_id'),false);
+      const confirmed=list.pedidos.find(p=>p.status==='confirmed');
+      const detailUrl=url+'/'+confirmed.id;
+      assert.equal((await app.inject({url:detailUrl,headers:headers(customer)})).statusCode,403);
+      const detail=(await app.inject({url:detailUrl,headers:headers(talissa)})).json();
+      assert.equal(detail.pedido.details.total,confirmed.total);
+      assert.deepEqual(detail.historico.map(e=>e.event_type),['created','payment_confirmed']);
+      assert.equal(detail.pedido.customer_id,undefined);
+      assert.equal((await app.inject({url:url+'/'+randomUUID(),headers:headers(dennis)})).statusCode,404);
+      const filtered=(await app.inject({url:url+'?status=pending&pagamento=credito',headers:headers(dennis)})).json();
+      assert.equal(filtered.resumo.quantidade,1);
+      const search=(await app.inject({url:url+'?busca='+confirmed.id.toUpperCase(),headers:headers(dennis)})).json();
+      assert.equal(search.resumo.quantidade,1);
+      const remote=await buildApp({pool,origin:'https://loja.example',production:true});
+      try {assert.equal((await remote.inject(url)).statusCode,404)} finally {await remote.close()}
+    });
+    await t.test('painel pagina e filtra por data de Brasília sem expor dados de outros filtros', async () => {
+      const customerId=dennis.user.id;
+      const inserted=[];
+      const request=async query=>app.inject({url:'/api/admin/pedidos'+query,headers:headers(dennis)});
+      try {
+        for(let n=0;n<23;n++) {
+          const id=randomUUID();inserted.push(id);
+          const when=n===21?'2000-07-01T02:59:59Z':n===22?'2000-07-02T03:00:00Z':'2000-07-01T03:00:00Z';
+          await pool.query('INSERT INTO test_orders(id,customer_id,request_id,details,created_at) VALUES($1,$2,$3,$4,$5)',[id,customerId,randomUUID(),{total:100,pagamento:'pix',itens:[{quantidade:1}]},when]);
+        }
+        const query='?inicio=2000-07-01&fim=2000-07-01';
+        const first=await request(query);assert.equal(first.statusCode,200,first.body);
+        const a=first.json();const b=(await request(query+'&pagina=2')).json();
+        assert.equal(a.resumo.quantidade,21);assert.equal(a.resumo.total,2100);
+        assert.equal(a.pedidos.length,20);assert.equal(b.pedidos.length,1);
+        assert.equal(new Set([...a.pedidos,...b.pedidos].map(p=>p.id)).size,21);
+        assert.equal((await request(query+'&pagamento=credito')).json().resumo.quantidade,0);
+        for(const invalid of ['?pagina=0','?status=paid','?inicio=2026-02-30','?inicio=2026-10-11&fim=2026-10-10']) assert.equal((await request(invalid)).statusCode,400);
+        assert.equal((await request('?busca='+encodeURIComponent("' OR 1=1 --"))).json().resumo.quantidade,0);
+      } finally {await pool.query('DELETE FROM test_orders WHERE id=ANY($1::uuid[])',[inserted])}
+    });
     await t.test('edições simultâneas não sobrescrevem a versão vencedora', async () => {
       const revision = (await readCatalog(pool)).revision
       const responses = await Promise.all([save(dennis, { ...product, nome: 'Edição Dennis' }, revision), save(talissa, { ...product, nome: 'Edição Talissa' }, revision)])
@@ -341,6 +393,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       await restoreDatabase(restored, JSON.parse(JSON.stringify(snapshot)))
       assert.deepEqual(await readCatalog(restored), await readCatalog(pool))
       assert.deepEqual((await restored.query('SELECT * FROM test_orders ORDER BY id')).rows, (await pool.query('SELECT * FROM test_orders ORDER BY id')).rows)
+      assert.deepEqual((await restored.query('SELECT * FROM test_order_events ORDER BY order_id,event_type')).rows, (await pool.query('SELECT * FROM test_order_events ORDER BY order_id,event_type')).rows)
       assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 3)
       assert.equal((await restored.query("SELECT role FROM admins WHERE username='cliente@example.test'")).rows[0].role, 'customer')
       assert.equal((await restored.query('SELECT * FROM sessions')).rowCount, 0)

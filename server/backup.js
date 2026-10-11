@@ -7,7 +7,7 @@ export async function exportDatabase(pool) {
   return transaction(pool, async client => {
     await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
     const data = { aplicativo: 'studio-camadas-database', versao: 1, exportadoEm: new Date().toISOString() }
-    for (const table of ['schema_migrations', 'admins', 'catalog_state', 'products', 'product_revisions', 'audit_events', 'test_orders']) data[table] = (await client.query(`SELECT * FROM ${table}`)).rows
+    for (const table of ['schema_migrations', 'admins', 'catalog_state', 'products', 'product_revisions', 'audit_events', 'test_orders', 'test_order_events']) data[table] = (await client.query(`SELECT * FROM ${table}`)).rows
     return data
   })
 }
@@ -19,6 +19,7 @@ export async function restoreDatabase(pool, data) {
     products: ['id', 'data', 'updated_by', 'updated_at'],
     product_revisions: ['product_id', 'revision', 'data', 'actor_id', 'created_at'],
     test_orders: ['id', 'customer_id', 'guest_id', 'request_id', 'details', 'status', 'created_at'],
+    test_order_events: ['order_id', 'event_type', 'occurred_at'],
     audit_events: ['id', 'actor_id', 'action', 'product_id', 'created_at'],
   }
   for (const table of [...Object.keys(tables), 'schema_migrations', 'catalog_state']) if (!Array.isArray(data[table])) throw new Error('Backup incompleto.')

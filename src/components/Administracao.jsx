@@ -3,10 +3,12 @@ import React, { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { api, downloadJson } from '../lib/api'
 import { carregarProdutos, criarBackup, lerBackup, LIMITE_BACKUP_BYTES } from '../lib/persistencia'
 
+const Pedidos = lazy(() => import('./Pedidos'))
 const Gestao = lazy(() => import('./Gestao'))
 const inputClass = 'w-full rounded-lg border border-gray-300 p-3 text-gray-900'
 
 export default function Administracao({ session, setSession }) {
+  const [secao, setSecao] = useState(() => new URLSearchParams(window.location.search).get('secao') === 'pedidos' ? 'pedidos' : 'produtos')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -97,7 +99,7 @@ export default function Administracao({ session, setSession }) {
     <div className="mx-auto max-w-7xl px-4 sm:px-6">
       <a href="/" className="mb-6 inline-block text-camada-teal-700 underline">← Voltar à loja</a>
       <h1 id="admin-title" className="text-3xl font-bold text-gray-900">Administração</h1>
-      <p className="mt-2 text-gray-600">Produtos, fichas e licenças em um cadastro compartilhado.</p>
+      <p className="mt-2 text-gray-600">Produtos, fichas, licenças e consulta de pedidos.</p>
       {error && <p role="alert" className="my-4 rounded-lg bg-red-50 p-4 text-red-800">{error}</p>}
       {notice && <p role="status" className="my-4 rounded-lg bg-camada-teal-50 p-4 text-camada-teal-800">{notice}</p>}
       <>
@@ -116,6 +118,9 @@ export default function Administracao({ session, setSession }) {
           <button disabled={busy} className="btn-primary disabled:opacity-50">Salvar nova senha</button>
         </form>}
         {!session.user.mustChangePassword && <>
+          <nav aria-label="Áreas da administração" className="flex gap-3 my-6"><button className={secao === 'produtos' ? 'btn-primary' : 'rounded-lg border px-4 py-2'} aria-pressed={secao === 'produtos'} onClick={() => setSecao('produtos')}>Produtos</button><button className={secao === 'pedidos' ? 'btn-primary' : 'rounded-lg border px-4 py-2'} aria-pressed={secao === 'pedidos'} onClick={() => setSecao('pedidos')}>Pedidos</button></nav>
+          {secao === 'pedidos' && <Suspense fallback={<p>Carregando pedidos…</p>}><Pedidos key={session.user.id} /></Suspense>}
+          <div hidden={secao !== 'produtos'}>
           {!catalog ? <button className="my-4 rounded-lg border px-4 py-2" onClick={async () => { try { const data = await api('/admin/produtos'); catalogRef.current = data; setCatalog(data); setError('') } catch (error) { setError(error.message) } }}>Carregar cadastro</button> : <>
             <details className="my-4 rounded-xl border bg-white p-4"><summary className="cursor-pointer font-medium">Trazer cadastros da versão anterior</summary><p className="my-3 text-sm text-gray-600">Importa os produtos salvos neste navegador. Produtos com o mesmo identificador serão atualizados; os demais serão mantidos. Salve seu formulário e exporte um backup antes de importar.</p><button disabled={busy || dirty} onClick={importLocal} className="rounded-lg border px-4 py-2 disabled:opacity-50">Importar cadastros deste navegador</button></details>
             <Suspense fallback={<p>Carregando painel…</p>}><Gestao key={editorKey} produtos={catalog.produtos} fonte="servidor" onAlterado={setDirty} onSalvar={produto => mutate(`/admin/produtos/${encodeURIComponent(produto.id)}`, 'PUT', { produto, revision: catalogRef.current.revision })} onExportar={() => downloadJson(criarBackup(catalogRef.current.produtos), `studio-camadas-catalogo-${Date.now()}.json`)} onImportar={importFile} erroPersistencia="" /></Suspense>
@@ -124,6 +129,7 @@ export default function Administracao({ session, setSession }) {
               {events && <ul className="space-y-2 text-sm">{events.map(event => <li key={event.id} className="border-t py-2">{new Date(event.created_at).toLocaleString('pt-BR')} · {event.actor_name || 'Administração local'} · {({ 'product.saved': 'Produto salvo', 'product.imported': 'Produto importado', 'auth.login': 'Entrada', 'auth.logout': 'Saída', 'auth.password_changed': 'Senha alterada', 'auth.password_reset_locally': 'Acesso recuperado', 'auth.account_created': 'Conta criada' })[event.action] || event.action}{event.product_id && ` · ${catalog.produtos.find(p => p.id === event.product_id)?.nome || event.product_id}`}</li>)}</ul>}
             </details>
           </>}
+          </div>
         </>}
       </>
     </div>

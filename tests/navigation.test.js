@@ -10,13 +10,22 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { podeAdministrar } from '../src/lib/acesso.js'
 
 test('vitrine e navegação escondem administração para visitantes e contas comuns', async () => {
-  const compiled = await build({ stdin: { contents: "export { default as Navbar } from './src/components/Navbar.jsx'; export { default as App } from './src/App.jsx'; export { default as Login } from './src/components/Login.jsx';", resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, platform: 'node', format: 'esm', packages: 'external', jsx: 'automatic' })
+  const compiled = await build({ stdin: { contents: "export { DetalhePedido } from './src/components/Pedidos.jsx'; export { default as Navbar } from './src/components/Navbar.jsx'; export { default as App } from './src/App.jsx'; export { default as Login } from './src/components/Login.jsx';", resolveDir: process.cwd(), loader: 'jsx' }, bundle: true, write: false, platform: 'node', format: 'esm', packages: 'external', jsx: 'automatic' })
   await mkdir('.local', { recursive: true })
   const file = path.resolve('.local', `ui-check-${randomUUID()}.mjs`)
   await writeFile(file, compiled.outputFiles[0].text)
   const previousWindow = globalThis.window
   try {
-    const { Navbar, App, Login } = await import(pathToFileURL(file).href)
+    const { Navbar, App, Login, DetalhePedido } = await import(pathToFileURL(file).href)
+    const detailHtml = renderToStaticMarkup(React.createElement(DetalhePedido, {data: {
+      pedido: {id:'teste',created_at:'2026-10-11T12:00:00Z',status:'confirmed',producao:'Não iniciada (teste)',envio:'Não enviado (teste)',details:{itens:[{chave:'a',nome:'<script>não executar</script>',cor:'Branco',sku:'SKU',quantidade:2,precoCentavos:2990}],subtotal:5980,frete:0,total:5980,pagamento:'pix',endereco:{nome:'Pessoa fictícia',rua:'Rua teste',numero:'1',bairro:'Centro',cidade:'Cidade',uf:'SP',cep:'01001000'}}},
+      historico:[{event_type:'legacy_confirmation',occurred_at:null}]
+    }}));
+    assert.ok(detailHtml.includes('&lt;script&gt;'));
+    assert.equal(detailHtml.includes('<script>'),false);
+    assert.ok(detailHtml.includes('Data não registrada'));
+    assert.ok(detailHtml.includes('Não enviado (teste)'));
+    assert.ok(detailHtml.includes('59,80'));
     const loginPage = renderToStaticMarkup(React.createElement(Login, { session: null, onSession: () => {} }))
     assert.ok(loginPage.includes('Novo por aqui? Criar conta'))
     assert.ok(loginPage.includes('E-mail ou usuário'))

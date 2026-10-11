@@ -1,3 +1,4 @@
+import { transaction } from './db.js'
 import { token, digest, sameToken } from './security.js'
 import { randomUUID } from 'node:crypto'
 import { fail, publicCatalog } from './catalog.js'
@@ -64,17 +65,23 @@ export function registerCheckout(app, { pool, authenticated, enabled, catalogPre
     if (!Number.isSafeInteger(subtotal)) throw fail(400, 'Total do pedido inválido.')
     const snapshot = { itens: details.map(({ impressao, ...item }) => item), endereco: body.endereco, pagamento: body.pagamento, subtotal, frete: 0, total: subtotal, teste: true }
     const ownerColumn = request.customerId ? 'customer_id' : 'guest_id'
-    const result = await pool.query(`INSERT INTO test_orders(id,customer_id,guest_id,request_id,details) VALUES($1,$2,$3,$4,$5) ON CONFLICT(${ownerColumn},request_id) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING *`, [randomUUID(), request.customerId, request.guestId, body.requestId, snapshot])
-    return { pedido: view(result.rows[0]) }
+    return transaction(pool, async client => {
+      const result = await client.query(`INSERT INTO test_orders(id,customer_id,guest_id,request_id,details) VALUES($1,$2,$3,$4,$5) ON CONFLICT(${ownerColumn},request_id) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING *`, [randomUUID(), request.customerId, request.guestId, body.requestId, snapshot])
+      await client.query("INSERT INTO test_order_events(order_id,event_type,occurred_at) VALUES($1,'created',$2) ON CONFLICT DO NOTHING", [result.rows[0].id, result.rows[0].created_at])
+      return { pedido: view(result.rows[0]) }
+    })
   })
   app.get('/api/checkout/teste/:id', { onRequest: access, schema: { params: { type: 'object', properties: { id: uuid }, required: ['id'] } } }, async request => {
     const result = await pool.query('SELECT * FROM test_orders WHERE id=$1 AND (customer_id=$2 OR guest_id=$3)', [request.params.id, request.customerId, request.guestId])
     if (!result.rowCount) throw fail(404, 'Pedido não encontrado.')
     return { pedido: view(result.rows[0]) }
   })
-  app.post('/api/checkout/teste/:id/confirmar', { onRequest: access, schema: { params: { type: 'object', properties: { id: uuid }, required: ['id'] } } }, async request => {
-    const result = await pool.query("UPDATE test_orders SET status='confirmed' WHERE id=$1 AND (customer_id=$2 OR guest_id=$3) RETURNING *", [request.params.id, request.customerId, request.guestId])
-    if (!result.rowCount) throw fail(404, 'Pedido não encontrado.')
-    return { pedido: view(result.rows[0]) }
-  })
+  app.post('/api/checkout/teste/:id/confirmar', { onRequest: access, schema: { params: { type: 'object', properties: { id: uuid }, required: ['id'] } } }, async request => transaction(pool, async client => {
+    const values = [request.params.id, request.customerId, request.guestId]
+    const changed = await client.query("UPDATE test_orders SET status='confirmed' WHERE id=$1 AND (customer_id=$2 OR guest_id=$3) AND status='pending' RETURNING *", values)
+    if (changed.rowCount) await client.query("INSERT INTO test_order_events(order_id,event_type) VALUES($1,'payment_confirmed')", [request.params.id])
+    const row = changed.rows[0] || (await client.query('SELECT * FROM test_orders WHERE id=$1 AND (customer_id=$2 OR guest_id=$3)', values)).rows[0]
+    if (!row) throw fail(404, 'Pedido não encontrado.')
+    return { pedido: view(row) }
+  }))
 }

@@ -1,3 +1,4 @@
+import { registerAdminOrders } from './orders.js'
 import { criarConsultaViaCep } from './cep.js'
 import { registerCheckout } from './checkout.js'
 import Fastify from 'fastify'
@@ -151,6 +152,7 @@ export async function buildApp({ pool, origin = 'http://127.0.0.1:3000', product
     config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     schema: { params: { type: 'object', required: ['cep'], properties: { cep: { type: 'string', pattern: '^[0-9]{8}$' } } } },
   }, async request => ({ endereco: await consultarCep(request.params.cep) }))
+  registerAdminOrders(app, { pool, administrator, enabled: !production && environment === 'development' && ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname) })
   registerCheckout(app, { pool, authenticated, cookieName, cookieOptions, environment, catalogPreviewIds, enabled: !production && environment === 'development' && ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(origin).hostname) })
   return app
 }
