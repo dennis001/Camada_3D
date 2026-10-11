@@ -10,7 +10,6 @@ export default function EnderecoCheckout({ endereco, onChange, onContinuar }) {
   const [mensagem, setMensagem] = useState('')
   const [erro, setErro] = useState('')
   const [buscando, setBuscando] = useState(false)
-  const [tentativa, setTentativa] = useState(0)
   const ultimaConsulta = useRef(endereco.cep || '')
   const versao = useRef(0)
   const form = useRef(null)
@@ -28,11 +27,11 @@ export default function EnderecoCheckout({ endereco, onChange, onContinuar }) {
         onChange(atual => atual.cep === cep ? { ...atual, ...data.endereco } : atual)
         setMensagem(automaticos.some(key => !data.endereco[key]) ? 'Endereço encontrado parcialmente. Complete os campos que faltam.' : 'Endereço preenchido. Confira os dados e informe o número e complemento, se houver.')
       } catch (error) {
-        if (ativo && consulta === versao.current) setMensagem(error.status === 404 ? 'CEP não encontrado. Confira o CEP ou preencha o endereço manualmente.' : 'Não foi possível consultar o CEP agora. Você pode tentar novamente ou preencher o endereço manualmente.')
+        if (ativo && consulta === versao.current) setMensagem(error.status === 404 ? 'CEP não encontrado. Confira o CEP ou preencha o endereço manualmente.' : 'Não foi possível consultar o CEP agora. Preencha o endereço manualmente para continuar.')
       } finally { if (ativo && consulta === versao.current) setBuscando(false) }
     }, 350)
     return () => { ativo = false; clearTimeout(timer) }
-  }, [cep, tentativa, onChange])
+  }, [cep, onChange])
 
   function alterar(key, value) {
     setErro('')
@@ -61,7 +60,6 @@ export default function EnderecoCheckout({ endereco, onChange, onContinuar }) {
       {key === 'uf' ? <select name={key} autoComplete={autoComplete} value={endereco[key] || ''} disabled={buscando} onChange={event => alterar(key, event.target.value)} className={input}><option value="">Selecione</option>{estados.map(uf => <option key={uf}>{uf}</option>)}</select> : <input name={key} autoComplete={autoComplete} value={key === 'cep' ? cep.replace(/^(\d{5})(\d)/, '$1-$2') : endereco[key] || ''} onChange={event => alterar(key, event.target.value)} inputMode={key === 'cep' ? 'numeric' : undefined} required={key !== 'complemento'} maxLength={key === 'cep' ? 9 : 160} disabled={buscando && automaticos.includes(key)} className={input} />}
     </label>)}</div>
     <p role="status" aria-live="polite" className="text-sm text-gray-600">{mensagem}</p>
-    {cep.length === 8 && !buscando && <button type="button" className="underline text-sm text-camada-teal-700" onClick={() => { ultimaConsulta.current = ''; setTentativa(value => value + 1) }}>Consultar CEP novamente</button>}
     {erro && <p role="alert" className="text-red-700">{erro}</p>}
     <button disabled={buscando} className="btn-primary disabled:opacity-50">{buscando ? 'Consultando CEP…' : 'Continuar para entrega'}</button>
   </form>
