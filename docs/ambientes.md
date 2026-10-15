@@ -26,6 +26,8 @@ Todo desenvolvimento e push devem ocorrer em branch própria. O usuário revisa 
 
 ## Configuração preparada
 
+Para visualizar um rascunho na vitrine local, configure `CATALOG_PREVIEW_IDS` no `.env` com os IDs separados por vírgula e reinicie a API. A saboneteira usa `saboneteira-floral`. O produto aparece como **Prévia de teste**, mantém o status de rascunho no cadastro e não expõe custos/licenças. Essa opção é recusada em produção ou com origem externa; remova-a antes de configurar a hospedagem. Para encerrar a prévia, deixe a variável vazia e reinicie a API.
+
 Os modelos `deploy/production.env.example` e `deploy/development.env.example` usam processos nas portas 3001 e 3002 e usuários/bancos PostgreSQL diferentes. Podem ficar na mesma máquina inicialmente, em diretórios separados. Cada usuário do banco deve ter permissão somente sobre seu próprio banco. Não usar o superusuário do PostgreSQL portátil na hospedagem.
 
 Copie cada modelo para um arquivo privado fora do Git, substitua as credenciais e carregue-o com `ENV_FILE`. Essa variável aceita caminho absoluto. Variáveis já presentes no processo têm precedência sobre o arquivo: não reutilize um terminal com `DATABASE_URL` de outro ambiente. Execute migrações, criação inicial de contas e API com o mesmo arquivo selecionado:

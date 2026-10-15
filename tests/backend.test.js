@@ -39,7 +39,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
   const database = await localPostgres({ directory, port, password: dbPassword })
   let pool, restored, app
   const credentials = { dennis: token(), talissa: token() }
-  const newPassword = token()
+  const newPassword = 'Abcdef!g'
   let dennis, talissa, product
   function headers(session) { return { origin, cookie: session.cookie, 'x-csrf-token': session.csrfToken } }
   async function login(username, password, instance = app, loginOrigin = origin) {
@@ -60,7 +60,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     app = await buildApp({ pool, origin, loginMax: 100 })
 
     await t.test('migrações são repetíveis, área privada e origem externa são bloqueadas', async () => {
-      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 2)
+      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 5)
       for (const url of ['/api/admin/produtos', '/api/admin/historico', '/api/auth/me']) assert.equal((await app.inject(url)).statusCode, 401)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/login', headers: { origin: 'https://intruso.invalid' }, payload: { username: 'dennis', password: credentials.dennis } })).statusCode, 403)
       assert.equal((await app.inject({ method: 'PUT', url: '/api/admin/produtos/p', headers: { origin }, payload: { produto: fixture(), revision: 0 } })).statusCode, 401)
@@ -72,6 +72,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.ok(initial.response.headers['set-cookie'].includes('SameSite=Strict'))
       assert.equal((await app.inject({ url: '/api/admin/produtos', headers: headers(initial) })).statusCode, 403)
       assert.equal((await app.inject({ method: 'POST', url: '/api/auth/password', headers: { origin, cookie: initial.cookie }, payload: { currentPassword: credentials.dennis, newPassword } })).statusCode, 403)
+      const weak = await app.inject({ method: 'POST', url: '/api/auth/password', headers: headers(initial), payload: { currentPassword: credentials.dennis, newPassword: 'abcdefgh' } })
+      assert.equal(weak.statusCode, 400)
+      assert.match(weak.json().error, /maiúscula/)
       const changed = await app.inject({ method: 'POST', url: '/api/auth/password', headers: headers(initial), payload: { currentPassword: credentials.dennis, newPassword } })
       assert.equal(changed.statusCode, 200, changed.body)
       assert.equal((await app.inject({ url: '/api/auth/me', headers: headers(initial) })).statusCode, 401)
@@ -100,6 +103,38 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
         assert.equal((await app.inject('/api/catalogo')).statusCode, 200)
       } finally { await pool.query("UPDATE admins SET role='admin' WHERE username='dennis'") }
     })
+    await t.test('cadastro público cria cliente persistente sem acesso administrativo', async () => {
+      const payload = { name: 'Cliente Teste', email: ' CLIENTE@example.test ', password: 'Abcdef!g' }
+      const register = body => app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload: body })
+      assert.equal((await register({ ...payload, role: 'admin' })).statusCode, 400)
+      assert.equal((await register({ ...payload, email: 'dennis' })).statusCode, 400)
+      assert.equal((await app.inject({ method: 'POST', url: '/api/auth/register', headers: { origin: 'https://intruso.invalid' }, payload })).statusCode, 403)
+      const response = await register(payload)
+      assert.equal(response.statusCode, 201, response.body)
+      assert.equal(response.body.includes(payload.password), false)
+      const customer = await login('cliente@EXAMPLE.test', payload.password)
+      assert.equal(customer.user.role, 'customer')
+      assert.equal(customer.user.mustChangePassword, false)
+      for (const url of ['/api/admin/produtos', '/api/admin/historico']) assert.equal((await app.inject({ url, headers: headers(customer) })).statusCode, 403)
+      assert.equal((await save(customer, fixture(), 0)).statusCode, 403)
+      assert.equal((await register({ ...payload, email: 'cliente@example.test' })).statusCode, 409)
+      const weak = await register({ ...payload, email: 'outra@example.test', password: 'ABCDEFG!' })
+      assert.equal(weak.statusCode, 400)
+      assert.match(weak.json().error, /minúscula/)
+      const stored = (await pool.query("SELECT * FROM admins WHERE username='cliente@example.test'")).rows[0]
+      assert.notEqual(stored.password_hash, payload.password)
+      assert.equal((await pool.query("SELECT count(*)::int AS count FROM admins WHERE username='cliente@example.test'")).rows[0].count, 1)
+      assert.equal((await app.inject({ method: 'POST', url: '/api/auth/logout', headers: headers(customer) })).statusCode, 200)
+      assert.equal((await app.inject({ url: '/api/auth/me', headers: headers(customer) })).statusCode, 401)
+    })
+    await t.test('cadastro rejeita dados inválidos e limita tentativas', async () => {
+      const limited = await buildApp({ pool, origin })
+      try {
+        const payload = { name: '  ', email: 'invalido', password: token() }
+        for (let i = 0; i < 5; i++) assert.equal((await limited.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload })).statusCode, 400)
+        assert.equal((await limited.inject({ method: 'POST', url: '/api/auth/register', headers: { origin }, payload })).statusCode, 429)
+      } finally { await limited.close() }
+    })
     await t.test('sessões e origens de desenvolvimento não são aceitas em produção', async () => {
       const prod = await buildApp({ pool, origin: 'https://studiocamadas.com.br', production: true, environment: 'production' })
       try {
@@ -114,6 +149,7 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     })
     await t.test('salvar rascunho persiste no banco compartilhado e exige CSRF', async () => {
       product = fixture()
+      product.cores[0].imagem = '/produtos/teste/verde.png'
       const denied = await app.inject({ method: 'PUT', url: `/api/admin/produtos/${product.id}`, headers: { origin, cookie: dennis.cookie }, payload: { produto: product, revision: 0 } })
       assert.equal(denied.statusCode, 403)
       const saved = await save(dennis, product, 0)
@@ -121,7 +157,24 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(saved.json().revision, 1)
       const shared = await app.inject({ url: '/api/admin/produtos', headers: headers(talissa) })
       assert.equal(shared.json().produtos[0].id, product.id)
+      assert.equal(shared.json().produtos[0].cores[0].imagem, '/produtos/teste/verde.png')
       assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
+    })
+    await t.test('prévia local mostra apenas rascunhos selecionados sem liberar produção ou dados privados', async () => {
+      const preview = await buildApp({ pool, origin, catalogPreviewIds: [product.id] })
+      try {
+        const items = (await preview.inject('/api/catalogo')).json().produtos
+        assert.equal(items.length, 1)
+        assert.equal(items[0].id, product.id)
+        assert.equal(items[0].emTeste, true)
+        assert.equal(items[0].ficha, undefined)
+        assert.equal(items[0].origem, undefined)
+        assert.deepEqual((await app.inject('/api/catalogo')).json().produtos, [])
+        assert.equal((await readCatalog(pool)).produtos[0].publicado, false)
+      } finally { await preview.close() }
+      for (const options of [{ production: true, origin: 'https://studiocamadas.com.br' }, { environment: 'production' }, { origin: 'https://dev.studiocamadas.com.br' }]) {
+        await assert.rejects(buildApp({ pool, origin, catalogPreviewIds: [product.id], ...options }), /exclusiva do ambiente local/)
+      }
     })
     await t.test('publicação expõe só dados comerciais e guarda revisão e responsável', async () => {
       product.publicado = true
@@ -131,11 +184,138 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(publicProduct.precoCentavos, 129990)
       assert.equal(publicProduct.ficha, undefined)
       assert.equal(publicProduct.origem, undefined)
+      assert.equal(publicProduct.cores[0].imagem, '/produtos/teste/verde.png')
       const history = (await app.inject({ url: '/api/admin/historico', headers: headers(dennis) })).json().eventos
       assert.ok(history.some(e => e.actor_name === 'Talissa' && e.product_id === product.id))
       assert.equal(JSON.stringify(history).includes('password_hash'), false)
       assert.equal((await pool.query('SELECT * FROM product_revisions WHERE product_id=$1', [product.id])).rowCount, 2)
     })
+
+    await t.test('checkout de teste valida preço, identidade, CSRF e confirmação idempotente', async () => {
+      const customer = await login('cliente@example.test', 'Abcdef!g');
+      const catalog = (await app.inject('/api/catalogo')).json().produtos;
+      const item = catalog[0];
+      const payload = { requestId: randomUUID(), itens: [{ produtoId: item.id, corId: item.cores[0].id, quantidade: 5 }], endereco: { nome: 'Cliente Teste', cep: '01001000', rua: 'Rua fictícia', numero: '1', bairro: 'Centro', cidade: 'São Paulo', uf: 'SP' }, pagamento: 'pix' };
+      assert.equal((await app.inject('/api/checkout/config')).json().teste, true);
+      const url = '/api/checkout/teste';
+      assert.equal((await app.inject({method:'POST',url,headers:{origin},payload})).statusCode,401);
+      assert.equal((await app.inject({method:'POST',url,headers:{origin,cookie:customer.cookie},payload})).statusCode,403);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,total:1}})).statusCode,400);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,endereco:{...payload.endereco,cep:'123'}}})).statusCode,400);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,itens:[{...payload.itens[0],corId:'inexistente'}]}})).statusCode,409);
+      const created = await app.inject({method:'POST',url,headers:headers(customer),payload});
+      assert.equal(created.statusCode,200,created.body);
+      const order = created.json().pedido;
+      assert.equal(order.details.total,item.precoCentavos*5);
+      assert.equal(order.status,'pending');
+      const retry = await app.inject({method:'POST',url,headers:headers(customer),payload});
+      assert.equal(retry.json().pedido.id,order.id);
+      const detailUrl = url+'/'+order.id;
+      assert.equal((await app.inject({url:detailUrl,headers:headers(talissa)})).statusCode,404);
+      assert.equal((await app.inject({method:'POST',url:detailUrl+'/confirmar',headers:headers(talissa)})).statusCode,404);
+      for(let n=0;n<2;n++) assert.equal((await app.inject({method:'POST',url:detailUrl+'/confirmar',headers:headers(customer)})).json().pedido.status,'confirmed');
+      assert.equal((await app.inject({url:detailUrl,headers:headers(customer)})).json().pedido.status,'confirmed');
+      const remote = await buildApp({pool,origin:'https://loja.example',production:true});
+      try {
+        assert.equal((await remote.inject('/api/checkout/config')).json().teste,false);
+        assert.equal((await remote.inject({method:'POST',url,headers:{origin:'https://loja.example'},payload})).statusCode,404);
+      } finally {await remote.close()}
+      const credit = await app.inject({method:'POST',url,headers:headers(customer),payload:{...payload,requestId:randomUUID(),pagamento:'credito'}});
+      assert.equal(credit.json().pedido.details.pagamento,'credito');
+    });
+
+    await t.test('visitante compra sem conta, mantém pedido e não acessa pedidos de outro visitante', async () => {
+      const accountsBefore = (await pool.query('SELECT count(*) FROM admins')).rows[0].count;
+      const bootstrap = async () => {
+        const response = await app.inject({method:'POST',url:'/api/checkout/sessao',headers:{origin}});
+        assert.equal(response.statusCode,200,response.body);
+        assert.ok(response.headers['set-cookie'].includes('HttpOnly'));
+        assert.ok(response.headers['set-cookie'].includes('SameSite=Strict'));
+        return {csrfToken:response.json().csrfToken,cookie:response.cookies[0].name+'='+response.cookies[0].value};
+      };
+      const guest = await bootstrap(); const other = await bootstrap();
+      const item = (await app.inject('/api/catalogo')).json().produtos[0];
+      const payload = {requestId:randomUUID(),itens:[{produtoId:item.id,corId:item.cores[0].id,quantidade:2}],pagamento:'pix',endereco:{nome:'Visitante',cep:'01001000',rua:'Rua teste',numero:'S/N',bairro:'Centro',cidade:'São Paulo',uf:'SP',complemento:''}};
+      const url='/api/checkout/teste';
+      assert.equal((await app.inject({method:'POST',url,headers:{origin,cookie:guest.cookie},payload})).statusCode,403);
+      const created=await app.inject({method:'POST',url,headers:headers(guest),payload});
+      assert.equal(created.statusCode,200,created.body);
+      const id=created.json().pedido.id;
+      assert.equal(created.json().pedido.guest_id,undefined);
+      assert.equal((await pool.query('SELECT customer_id FROM test_orders WHERE id=$1',[id])).rows[0].customer_id,null);
+      assert.equal((await pool.query('SELECT count(*) FROM admins')).rows[0].count,accountsBefore);
+      assert.equal((await app.inject({method:'POST',url,headers:headers(guest),payload})).json().pedido.id,id);
+      assert.equal((await app.inject({url:url+'/'+id,headers:headers(guest)})).statusCode,200);
+      assert.equal((await app.inject({url:url+'/'+id,headers:headers(other)})).statusCode,404);
+      assert.equal((await app.inject({method:'POST',url:url+'/'+id+'/confirmar',headers:headers(other)})).statusCode,404);
+      assert.equal((await app.inject({method:'POST',url:url+'/'+id+'/confirmar',headers:headers(guest)})).json().pedido.status,'confirmed');
+      assert.equal((await app.inject({url:'/api/admin/produtos',headers:headers(guest)})).statusCode,401);
+      await pool.query("UPDATE checkout_guests SET expires_at=now()-interval '1 second'");
+      assert.equal((await app.inject({url:url+'/'+id,headers:headers(guest)})).statusCode,401);
+    });
+    await t.test('consulta CEP pública valida formato e usa o adaptador sem exigir conta', async () => {
+      let calls=0;
+      const cepApp=await buildApp({pool,origin,consultarCep:async cep=>{calls++;return {cep,rua:'Praça da Sé',bairro:'Sé',cidade:'São Paulo',uf:'SP'}}});
+      try {
+        assert.equal((await cepApp.inject('/api/cep/123')).statusCode,400);
+        assert.equal(calls,0);
+        const response=await cepApp.inject('/api/cep/01001000');
+        assert.equal(response.statusCode,200);
+        assert.equal(response.json().endereco.cidade,'São Paulo');
+      } finally {await cepApp.close()}
+    });
+
+    await t.test('painel de pedidos restringe acesso e preserva histórico e valores da compra', async () => {
+      const url='/api/admin/pedidos';
+      const customer=await login('cliente@example.test','Abcdef!g');
+      assert.equal((await app.inject(url)).statusCode,401);
+      assert.equal((await app.inject({url,headers:headers(customer)})).statusCode,403);
+      const response=await app.inject({url,headers:headers(dennis)});
+      assert.equal(response.statusCode,200,response.body);
+      const list=response.json();
+      assert.equal(list.resumo.quantidade,3);
+      assert.equal(list.resumo.confirmados,2);
+      assert.equal(list.resumo.pendentes,1);
+      assert.equal(list.resumo.total,list.pedidos.reduce((sum,p)=>sum+p.total,0));
+      assert.equal(response.body.includes('endereco'),false);
+      assert.equal(response.body.includes('customer_id'),false);
+      assert.equal(response.body.includes('guest_id'),false);
+      const confirmed=list.pedidos.find(p=>p.status==='confirmed');
+      const detailUrl=url+'/'+confirmed.id;
+      assert.equal((await app.inject({url:detailUrl,headers:headers(customer)})).statusCode,403);
+      const detail=(await app.inject({url:detailUrl,headers:headers(talissa)})).json();
+      assert.equal(detail.pedido.details.total,confirmed.total);
+      assert.deepEqual(detail.historico.map(e=>e.event_type),['created','payment_confirmed']);
+      assert.equal(detail.pedido.customer_id,undefined);
+      assert.equal((await app.inject({url:url+'/'+randomUUID(),headers:headers(dennis)})).statusCode,404);
+      const filtered=(await app.inject({url:url+'?status=pending&pagamento=credito',headers:headers(dennis)})).json();
+      assert.equal(filtered.resumo.quantidade,1);
+      const search=(await app.inject({url:url+'?busca='+confirmed.id.toUpperCase(),headers:headers(dennis)})).json();
+      assert.equal(search.resumo.quantidade,1);
+      const remote=await buildApp({pool,origin:'https://loja.example',production:true});
+      try {assert.equal((await remote.inject(url)).statusCode,404)} finally {await remote.close()}
+    });
+    await t.test('painel pagina e filtra por data de Brasília sem expor dados de outros filtros', async () => {
+      const customerId=dennis.user.id;
+      const inserted=[];
+      const request=async query=>app.inject({url:'/api/admin/pedidos'+query,headers:headers(dennis)});
+      try {
+        for(let n=0;n<23;n++) {
+          const id=randomUUID();inserted.push(id);
+          const when=n===21?'2000-07-01T02:59:59Z':n===22?'2000-07-02T03:00:00Z':'2000-07-01T03:00:00Z';
+          await pool.query('INSERT INTO test_orders(id,customer_id,request_id,details,created_at) VALUES($1,$2,$3,$4,$5)',[id,customerId,randomUUID(),{total:100,pagamento:'pix',itens:[{quantidade:1}]},when]);
+        }
+        const query='?inicio=2000-07-01&fim=2000-07-01';
+        const first=await request(query);assert.equal(first.statusCode,200,first.body);
+        const a=first.json();const b=(await request(query+'&pagina=2')).json();
+        assert.equal(a.resumo.quantidade,21);assert.equal(a.resumo.total,2100);
+        assert.equal(a.pedidos.length,20);assert.equal(b.pedidos.length,1);
+        assert.equal(new Set([...a.pedidos,...b.pedidos].map(p=>p.id)).size,21);
+        assert.equal((await request(query+'&pagamento=credito')).json().resumo.quantidade,0);
+        for(const invalid of ['?pagina=0','?status=paid','?inicio=2026-02-30','?inicio=2026-10-11&fim=2026-10-10']) assert.equal((await request(invalid)).statusCode,400);
+        assert.equal((await request('?busca='+encodeURIComponent("' OR 1=1 --"))).json().resumo.quantidade,0);
+      } finally {await pool.query('DELETE FROM test_orders WHERE id=ANY($1::uuid[])',[inserted])}
+    });
     await t.test('edições simultâneas não sobrescrevem a versão vencedora', async () => {
       const revision = (await readCatalog(pool)).revision
       const responses = await Promise.all([save(dennis, { ...product, nome: 'Edição Dennis' }, revision), save(talissa, { ...product, nome: 'Edição Talissa' }, revision)])
@@ -154,6 +334,9 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
       assert.equal(imported.statusCode, 400)
       assert.deepEqual(await readCatalog(pool), before)
       assert.equal((await save(dennis, { ...fixture(), imagens: ['javascript:alert(1)'] }, before.revision)).statusCode, 400)
+      const invalidImage = fixture()
+      invalidImage.cores[0].imagem = 'javascript:alert(1)'
+      assert.equal((await save(dennis, invalidImage, before.revision)).statusCode, 400)
       assert.equal((await save(dennis, { ...fixture(), cores: null }, before.revision)).statusCode, 400)
       const existing = (await pool.query('SELECT * FROM variants LIMIT 1')).rows[0]
       await assert.rejects(pool.query('INSERT INTO variants(product_id,id,sku_key,stock_site) VALUES($1,$2,$3,$4)', [existing.product_id, randomUUID(), existing.sku_key, 0]), { code: '23505' })
@@ -203,12 +386,16 @@ test('Backend integrado a PostgreSQL real', { timeout: 120000 }, async t => {
     await t.test('backup restaura cadastros, contas e histórico em banco vazio sem sessões', async () => {
       const snapshot = await exportDatabase(pool)
       assert.equal(snapshot.sessions, undefined)
+      assert.equal(snapshot.checkout_guests, undefined)
       await pool.query('CREATE DATABASE restore_test')
       restored = createPool(connectionString.replace('/postgres', '/restore_test'))
       await migrate(restored)
       await restoreDatabase(restored, JSON.parse(JSON.stringify(snapshot)))
       assert.deepEqual(await readCatalog(restored), await readCatalog(pool))
-      assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 2)
+      assert.deepEqual((await restored.query('SELECT * FROM test_orders ORDER BY id')).rows, (await pool.query('SELECT * FROM test_orders ORDER BY id')).rows)
+      assert.deepEqual((await restored.query('SELECT * FROM test_order_events ORDER BY order_id,event_type')).rows, (await pool.query('SELECT * FROM test_order_events ORDER BY order_id,event_type')).rows)
+      assert.equal((await restored.query('SELECT * FROM admins')).rowCount, 3)
+      assert.equal((await restored.query("SELECT role FROM admins WHERE username='cliente@example.test'")).rows[0].role, 'customer')
       assert.equal((await restored.query('SELECT * FROM sessions')).rowCount, 0)
       assert.equal((await restored.query('SELECT * FROM product_revisions')).rowCount, (await pool.query('SELECT * FROM product_revisions')).rowCount)
       await assert.rejects(restoreDatabase(restored, snapshot), /banco vazio/)

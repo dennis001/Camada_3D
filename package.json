@@ -7,6 +7,7 @@
   "scripts": {
     "setup:local": "node scripts/setup-local.mjs",
     "dev:full": "node scripts/dev-full.mjs",
+    "preview:full": "node scripts/dev-full.mjs --preview",
     "api:dev": "node --watch server/start.js",
     "api:start": "node server/start.js",
     "db:migrate": "node scripts/db-cli.mjs migrate",

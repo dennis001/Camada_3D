@@ -1,9 +1,10 @@
-import { createServer } from 'vite'
+import { createServer, preview } from 'vite'
 import { localPostgres } from './local-postgres.mjs'
 import { createPool, migrate } from '../server/db.js'
 import { loadConfig } from '../server/config.js'
 import { buildApp } from '../server/app.js'
 const config = loadConfig()
+const useBuild = process.argv.includes('--preview')
 if (config.production) throw new Error('dev:full é exclusivo do ambiente de desenvolvimento.')
 const url = new URL(config.connectionString)
 if (url.hostname !== '127.0.0.1' || url.port !== '55432' || url.pathname !== '/camada') throw new Error('Para PostgreSQL externo, inicie api:dev e dev separadamente.')
@@ -23,8 +24,13 @@ try {
   await migrate(pool)
   app = await buildApp({ pool, ...config })
   await app.listen({ host: config.host, port: config.port })
-  frontend = await createServer({ server: { open: false, strictPort: true } })
-  await frontend.listen()
+  if (useBuild) {
+    const built = await preview({ preview: { host: '127.0.0.1', port: 3000, strictPort: true, open: false, proxy: { '/api': `http://${config.host}:${config.port}` } } })
+    frontend = { close: () => new Promise((resolve, reject) => built.httpServer.close(error => error ? reject(error) : resolve())) }
+  } else {
+    frontend = await createServer({ server: { open: false, strictPort: true } })
+    await frontend.listen()
+  }
   console.log('Studio Camadas: http://127.0.0.1:3000 — login em /login e administração em /admin. Ctrl+C encerra os serviços.')
 } catch (error) { await close(); throw error }
 process.on('SIGINT', close)

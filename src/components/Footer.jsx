@@ -4,10 +4,10 @@ import Logo from './Logo'
 
 export default function Footer() {
   const links = [
-    { nome: 'Início', href: '#inicio' },
-    { nome: 'Catálogo', href: '#catalogo' },
-    { nome: 'Sobre o Studio', href: '#sobre' },
-    { nome: 'Carrinho', href: '#carrinho' },
+    { nome: 'Início', href: '/#inicio' },
+    { nome: 'Catálogo', href: '/#catalogo' },
+    { nome: 'Sobre o Studio', href: '/#sobre' },
+    { nome: 'Carrinho', href: '/carrinho' },
   ]
 
   return (

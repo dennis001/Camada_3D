@@ -15,7 +15,7 @@ export async function provisionAdmins(pool, resetUsername = null) {
       if (resetUsername && username !== resetUsername) continue
       const existing = await client.query('SELECT id FROM admins WHERE username=$1 FOR UPDATE', [username])
       if (existing.rowCount && !resetUsername) continue
-      const password = randomBytes(24).toString('base64url')
+      const password = `Aa!${randomBytes(24).toString('base64url')}`
       const hash = await hashPassword(password)
       const id = existing.rows[0]?.id || randomUUID()
       await client.query('INSERT INTO admins(id,username,name,password_hash) VALUES($1,$2,$3,$4) ON CONFLICT(username) DO UPDATE SET password_hash=$4,must_change_password=true,active=true', [id, username, name, hash])

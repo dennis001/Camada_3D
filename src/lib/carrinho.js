@@ -1,3 +1,5 @@
+import { estimarImpressao } from './producao.js'
+
 export function chaveItem(produtoId, corId) { return JSON.stringify([produtoId, corId]) }
 
 export function validarCarrinho(itens) {
@@ -19,8 +21,9 @@ export function detalharCarrinho(itens, produtos) {
     return {
       ...item, chave: chaveItem(item.produtoId, item.corId),
       nome: produto?.nome || 'Produto fora do catálogo', cor: cor?.nome || 'Cor indisponível', sku: cor?.sku || '',
-      precoCentavos: produto?.precoCentavos ?? null, estoqueSite: cor?.estoqueSite ?? 0,
-      indisponivel: !cor || !Number.isSafeInteger(produto?.precoCentavos) || produto.precoCentavos < 0 || item.quantidade > cor.estoqueSite,
+      precoCentavos: produto?.precoCentavos ?? null,
+      impressao: estimarImpressao(item.quantidade, produto?.producao),
+      indisponivel: !cor || !Number.isSafeInteger(produto?.precoCentavos) || produto.precoCentavos < 0,
     }
   })
 }
@@ -30,7 +33,6 @@ export function alterarQuantidade(itens, produtos, produtoId, corId, quantidade)
   const produto = produtos.find(p => p.id === produtoId)
   const cor = produto?.cores.find(c => c.id === corId)
   if (!cor || !Number.isSafeInteger(produto?.precoCentavos) || produto.precoCentavos < 0) throw new Error('Este produto ou cor não está mais disponível.')
-  if (quantidade > cor.estoqueSite) throw new Error(`Disponibilidade atual: ${cor.estoqueSite} unidade(s) desta cor.`)
   if (!Number.isSafeInteger(produto.precoCentavos * quantidade)) throw new Error('O valor deste item ultrapassa o limite suportado.')
   const existe = itens.some(item => item.produtoId === produtoId && item.corId === corId)
   const novo = { produtoId, corId, quantidade }

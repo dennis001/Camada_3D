@@ -256,7 +256,8 @@ test('projeção pública exclui custos, licença, documentos e futuros campos i
   produto.segredoInterno = 'não publicar'
   produto.cores[0].custoInternoCentavos = 999
   const publico = toProdutoPublico(produto)
-  assert.deepEqual(Object.keys(publico).sort(), ['id', 'nome', 'descricao', 'categoriaId', 'precoCentavos', 'material', 'medidas', 'imagens', 'cores'].sort())
+  assert.deepEqual(Object.keys(publico).sort(), ['id', 'nome', 'descricao', 'categoriaId', 'precoCentavos', 'material', 'medidas', 'imagens', 'cores', 'producao'].sort())
+  assert.deepEqual(Object.keys(publico.producao).sort(), ['tempoPlacaMinutos', 'unidadesPorPlaca'].sort())
   assert.deepEqual(Object.keys(publico.cores[0]).sort(), ['id', 'sku', 'nome', 'estoqueSite'].sort())
   assert.equal(publico.precoCentavos, 2000)
   publico.imagens.push('/outra-foto.jpg')
